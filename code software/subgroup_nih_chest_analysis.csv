@@ -1,0 +1,5 @@
+,Filename,PSNR_dB,PSNR_dB,SSIM,SSIM,MS_SSIM,MS_SSIM,LPIPS,LPIPS,EPI,EPI,CNR,CNR,Mean_0_255,STD_0_255
+,count,mean,std,mean,std,mean,std,mean,std,mean,std,mean,std,mean,mean
+Dataset_Source,,,,,,,,,,,,,,,
+Chest Dataset,450,38.9336,1.0547,0.9231,0.0184,0.9867,0.003,0.3514,0.0473,0.6988,0.065,0.0029,0.0006,122.6066,60.7102
+NIH Dataset,1750,42.3165,1.8535,0.9633,0.0162,0.9935,0.0023,0.2249,0.0698,0.8361,0.065,0.0033,0.0013,132.5777,58.5063
