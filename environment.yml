@@ -1,0 +1,27 @@
+name: superres
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  # PyTorch — chọn 1 trong 2 dòng bên dưới:
+  # [GPU - Windows có card NVIDIA] Giữ nguyên dòng này:
+  - pytorch::pytorch
+  - pytorch::torchvision
+  - pytorch::pytorch-cuda=12.1
+  # [CPU only - không có card NVIDIA] Xóa 3 dòng trên, bỏ comment 2 dòng này:
+  # - pytorch::pytorch
+  # - pytorch::torchvision
+  - pip:
+    - Pillow
+    - numpy
+    - pandas
+    - tqdm
+    - opencv-python
+    - matplotlib
+    - scikit-image
+    - jupyter
+    - ipykernel
