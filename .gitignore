@@ -42,6 +42,7 @@ conda-env/
 # PyTorch / Models / Large outputs
 *.pt
 *.pth
+!code software/models/weight_models/**
 *.onnx
 *.engine
 code software/sr_outputs.zip
