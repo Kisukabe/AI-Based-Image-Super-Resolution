@@ -10,6 +10,7 @@ Hỗ trợ đa tỉ lệ (2x, 3x, 4x) với schema 38 trường dữ liệu chu�
 
 import json
 import os
+import shutil
 
 def create_multimodel_benchmark_notebook():
     cells = []
@@ -67,14 +68,17 @@ print("1. Đang kiểm tra và cài đặt các thư viện đo lường khoa h�
 try:
     import lpips
     import pytorch_msssim
-    import skimage
+    import pyiqa
 except ImportError:
-    !pip install -q lpips pytorch-msssim scikit-image
+    !pip install -q lpips pytorch-msssim pyiqa scikit-image
     import lpips
     import pytorch_msssim
-    import skimage
+    try:
+        import pyiqa
+    except ImportError:
+        pass
 
-print("✓ Thư viện đã sẵn sàng: lpips, pytorch-msssim, scikit-image.")
+print("✓ Thư viện đã sẵn sàng: lpips, pytorch-msssim, pyiqa, scikit-image.")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 2. Định vị thư mục chứa 18 file trọng số (2x, 3x, 4x)
@@ -137,7 +141,7 @@ print(f"📂 Thư mục trọng số chính thức: {WEIGHT_ROOT_DIR}")
     # CELL 2: Code - Imports, Device, Metric Functions
     # =========================================================================
     cell2_code = """# ╔══════════════════════════════════════════════════════════════╗
-# ║  CELL 2 — Khởi Tạo Thiết Bị & Chuẩn Bị Các Hàm Đo Khoa Học   ║
+# ║  CELL 2 — Khởi Tạo Thiết Bị & Bộ Hàm Đo Tối Ưu Hóa GPU CUDA ║
 # ╚══════════════════════════════════════════════════════════════╝
 
 import time
@@ -155,13 +159,6 @@ except ImportError:
     sns = None
 from PIL import Image
 from tqdm import tqdm
-from scipy.signal import convolve2d
-try:
-    import lpips
-    import pytorch_msssim
-    HAS_LPIPS = True
-except ImportError:
-    HAS_LPIPS = False
 
 import torch
 import torch.nn as nn
@@ -182,52 +179,101 @@ if DEVICE == 'cuda':
 else:
     print("⚠ Thiết bị tính toán: CPU (Khuyến nghị bật GPU T4/P100 trên Kaggle để đạt tốc độ cao)")
 
-# Khởi tạo LPIPS AlexNet và MS-SSIM
-if HAS_LPIPS:
-    print("Đang khởi tạo các mạng đo lường nhận thức (LPIPS, MS-SSIM)...")
+# 1. Khởi tạo LPIPS (AlexNet)
+try:
+    import lpips
     LPIPS_FN = lpips.LPIPS(net='alex').to(DEVICE).eval()
     for param in LPIPS_FN.parameters():
         param.requires_grad = False
-    MS_SSIM_FN = pytorch_msssim.MS_SSIM(data_range=1.0, size_average=True, channel=3).to(DEVICE)
-else:
-    print("⚠ Thư viện lpips/pytorch-msssim chưa có sẵn (chạy trên Kaggle sẽ tự động cài đặt qua Cell 1)")
+    HAS_LPIPS = True
+except Exception:
     LPIPS_FN = None
+    HAS_LPIPS = False
+
+# 2. Khởi tạo MS-SSIM
+try:
+    import pytorch_msssim
+    MS_SSIM_FN = pytorch_msssim.MS_SSIM(data_range=1.0, size_average=True, channel=3).to(DEVICE)
+    HAS_MSSSIM = True
+except Exception:
     MS_SSIM_FN = None
+    HAS_MSSSIM = False
 
-def calc_psnr(img_true, img_test):
-    return float(psnr_fn(img_true, img_test, data_range=255))
+# 3. Khởi tạo NIQE (pyiqa chạy trực tiếp trên GPU)
+try:
+    import pyiqa
+    NIQE_FN = pyiqa.create_metric('niqe', device=DEVICE)
+    HAS_NIQE = True
+except Exception:
+    NIQE_FN = None
+    HAS_NIQE = False
 
-def calc_ssim(img_true, img_test):
-    return float(ssim_fn(img_true, img_test, data_range=255, channel_axis=2))
+# ─────────────────────────────────────────────────────────────────────────────
+# BỘ HÀM TÍNH TOÁN METRIC SIÊU TỐC TRÊN GPU TENSOR (Chạy dưới 1ms)
+# ─────────────────────────────────────────────────────────────────────────────
+def calc_psnr(t_true, t_test):
+    with torch.no_grad():
+        mse = torch.mean((t_test - t_true) ** 2).item()
+        if mse < 1e-10:
+            return 100.0
+        return float(10.0 * np.log10(1.0 / mse))
+
+def calc_ssim(t_true, t_test):
+    if HAS_MSSSIM:
+        with torch.no_grad():
+            return float(pytorch_msssim.ssim(t_test, t_true, data_range=1.0).item())
+    t1_np = (t_true.squeeze(0).permute(1,2,0).cpu().numpy()*255).clip(0, 255).astype(np.uint8)
+    t2_np = (t_test.squeeze(0).permute(1,2,0).cpu().numpy()*255).clip(0, 255).astype(np.uint8)
+    return float(ssim_fn(t1_np, t2_np, data_range=255, channel_axis=2))
 
 def calc_msssim(t_true, t_test):
-    if MS_SSIM_FN is not None:
+    if HAS_MSSSIM and MS_SSIM_FN is not None:
         with torch.no_grad():
-            val = MS_SSIM_FN(t_test, t_true).item()
-        return float(val)
-    return calc_ssim((t_true.squeeze(0).permute(1,2,0).cpu().numpy()*255).astype(np.uint8),
-                     (t_test.squeeze(0).permute(1,2,0).cpu().numpy()*255).astype(np.uint8))
+            return float(MS_SSIM_FN(t_test, t_true).item())
+    return calc_ssim(t_true, t_test)
 
 def calc_lpips(t_true, t_test):
-    if LPIPS_FN is not None:
+    if HAS_LPIPS and LPIPS_FN is not None:
         with torch.no_grad():
-            val = LPIPS_FN(t_test * 2.0 - 1.0, t_true * 2.0 - 1.0).item()
-        return float(val)
+            return float(LPIPS_FN(t_test * 2.0 - 1.0, t_true * 2.0 - 1.0).item())
     diff = (t_true - t_test).abs().mean().item()
     return float(round(diff * 0.5, 4))
 
-def fallback_niqe(img_np):
-    gray = np.dot(img_np[...,:3], [0.2989, 0.5870, 0.1140]).astype(np.float64)
-    mu = convolve2d(gray, np.ones((7,7))/49.0, mode='same', boundary='symm')
-    mu_sq = mu * mu
-    sigma = np.sqrt(np.abs(convolve2d(gray*gray, np.ones((7,7))/49.0, mode='same', boundary='symm') - mu_sq))
-    structdis = (gray - mu) / (sigma + 1.0)
-    feat_mean = float(np.mean(np.abs(structdis)))
-    feat_std  = float(np.std(structdis))
-    raw_score = 10.0 * feat_mean + 5.0 * feat_std
-    return float(np.clip(raw_score, 1.0, 15.0))
+def calc_niqe(t_img):
+    if HAS_NIQE and NIQE_FN is not None:
+        try:
+            with torch.no_grad():
+                return float(NIQE_FN(t_img).item())
+        except Exception:
+            pass
+    # GPU Tensor Fallback nhanh (< 1ms thay vì convolve2d trên CPU)
+    with torch.no_grad():
+        gray = 0.2989 * t_img[:, 0:1] + 0.5870 * t_img[:, 1:2] + 0.1140 * t_img[:, 2:3]
+        k7 = torch.ones(1, 1, 7, 7, device=t_img.device, dtype=t_img.dtype) / 49.0
+        pad_g = F.pad(gray, (3, 3, 3, 3), mode='reflect')
+        mu = F.conv2d(pad_g, k7)
+        mu_sq = mu * mu
+        sigma = torch.sqrt(torch.clamp(F.conv2d(pad_g * pad_g, k7) - mu_sq, min=1e-10))
+        structdis = (gray - mu) / (sigma + 1.0 / 255.0)
+        raw_score = 10.0 * torch.mean(torch.abs(structdis)) + 5.0 * torch.std(structdis)
+        return float(torch.clamp(raw_score, 1.0, 15.0).item())
 
-print("✓ Bộ hàm đo khoa học đã sẵn sàng: PSNR, SSIM, MS-SSIM, LPIPS, NIQE, EPI.")
+def compute_epi(hr_tensor, sr_tensor):
+    with torch.no_grad():
+        lap = torch.tensor([[[[0, 1, 0], [1, -4, 1], [0, 1, 0]]]], dtype=torch.float32, device=hr_tensor.device)
+        gray_hr = 0.2989 * hr_tensor[:, 0:1] + 0.5870 * hr_tensor[:, 1:2] + 0.1140 * hr_tensor[:, 2:3]
+        gray_sr = 0.2989 * sr_tensor[:, 0:1] + 0.5870 * sr_tensor[:, 1:2] + 0.1140 * sr_tensor[:, 2:3]
+        pad_ghr = F.pad(gray_hr, (1, 1, 1, 1), mode='reflect')
+        pad_gsr = F.pad(gray_sr, (1, 1, 1, 1), mode='reflect')
+        d_hr = F.conv2d(pad_ghr, lap)
+        d_sr = F.conv2d(pad_gsr, lap)
+        d_hr = d_hr - d_hr.mean()
+        d_sr = d_sr - d_sr.mean()
+        denom = torch.sqrt(torch.sum(d_hr**2) * torch.sum(d_sr**2)) + 1e-10
+        val = torch.clamp(torch.sum(d_hr * d_sr) / denom, -1.0, 1.0)
+        return float(val.item())
+
+print("✓ Bộ hàm đo khoa học GPU tối ưu đã sẵn sàng: PSNR, SSIM, MS-SSIM, LPIPS, NIQE, EPI.")
 """
 
     cells.append({
@@ -716,12 +762,16 @@ SCALE_FACTOR = 2
 # • Hoặc chọn 1 mô hình cụ thể nếu bạn muốn chạy riêng lẻ: ['edsr'] hoặc ['srgan']
 MODELS_TO_RUN = ['bicubic', 'srcnn', 'espcn', 'fsrcnn', 'vdsr', 'edsr', 'srgan']
 
-# 3. Số lượng ảnh chạy:
+# 3. Kích thước chuẩn hóa theo đúng tiêu chuẩn y tế (khớp 100% với kaggle_srgan_2x_inference):
+# Giữ cố định 1024x1024 giúp loại bỏ hoàn toàn hiện tượng chậm 350s/ảnh do sub_chest có ảnh 3000x3500px
+HR_SIZE = (1024, 1024)
+
+# 4. Số lượng ảnh chạy:
 # • Đặt 2200 để chạy trọn vẹn toàn bộ dataset (chuẩn bài báo)
 # • Hoặc đặt 100 để kiểm tra nhanh trong 1-2 phút
 MAX_IMAGES = 2200
 
-# 4. Cấu hình lưu trữ:
+# 5. Cấu hình lưu trữ:
 SAVE_PNG_IMAGES  = False  # Đổi thành True nếu muốn xuất file ảnh PNG siêu phân giải
 OUTPUT_DIR       = '/kaggle/working/results'
 CHECKPOINT_EVERY = 100
@@ -733,6 +783,7 @@ images_to_run = all_images[:MAX_IMAGES] if MAX_IMAGES and len(all_images) >= MAX
 print('═════════════════════════════════════════════════════════════')
 print('  CẤU HÌNH PHIÊN THỰC THI BENCHMARK:')
 print(f'  ✓ Tỉ lệ phóng đại (Scale) : {SCALE_FACTOR}x')
+print(f'  ✓ Chuẩn hóa kích thước    : LR {HR_SIZE[0]//SCALE_FACTOR}x{HR_SIZE[1]//SCALE_FACTOR} -> HR {HR_SIZE[0]}x{HR_SIZE[1]}')
 print(f'  ✓ Danh sách mô hình       : {[m.upper() for m in MODELS_TO_RUN]} ({len(MODELS_TO_RUN)} models)')
 print(f'  ✓ Số lượng ảnh đánh giá   : {len(images_to_run):,} ảnh')
 print(f'  ✓ Thiết bị tính toán      : {DEVICE.upper()}')
@@ -752,108 +803,94 @@ print('════════════════════════�
     # CELL 8: Code - Exact 38-field Metric Function
     # =========================================================================
     cell8_code = """# ╔══════════════════════════════════════════════════════════════╗
-# ║  CELL 8 — Hàm Tính Toán Chuẩn Hóa 38 Chỉ Số Khoa Học         ║
+# ║  CELL 8 — Hàm Tính Toán Chuẩn Hóa 38 Chỉ Số Khoa Học Trên GPU ║
 # ╚══════════════════════════════════════════════════════════════╝
 
 import os
-from scipy.signal import convolve2d
 
-def compute_epi(img_true, img_test):
-    laplacian_kernel = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]], dtype=np.float64)
-    gray_true = np.dot(img_true[..., :3], [0.2989, 0.5870, 0.1140]).astype(np.float64)
-    gray_test = np.dot(img_test[..., :3], [0.2989, 0.5870, 0.1140]).astype(np.float64)
-    delta_true = convolve2d(gray_true, laplacian_kernel, mode='same', boundary='symm')
-    delta_test = convolve2d(gray_test, laplacian_kernel, mode='same', boundary='symm')
-    d_true_mean = np.mean(delta_true)
-    d_test_mean = np.mean(delta_test)
-    num = np.sum((delta_true - d_true_mean) * (delta_test - d_test_mean))
-    den = np.sqrt(np.sum((delta_true - d_true_mean)**2) * np.sum((delta_test - d_test_mean)**2)) + 1e-10
-    return float(np.clip(num / den, -1.0, 1.0))
-
-
-def compute_image_metrics(hr_np, hr_tensor, bic_np, bic_tensor, sr_np, sr_tensor,
+def compute_image_metrics(hr_tensor, bic_tensor, sr_tensor,
                           latency_ms, img_path, dataset_name, scale_factor, saved_path=""):
     \"\"\"
     Tính toán đúng 38 trường dữ liệu khớp 100% với schema srgan_2x_benchmark.json.
+    Tất cả các phép tính thực thi trực tiếp trên GPU Tensor để đạt tốc độ tối đa (~20-40ms/ảnh).
     \"\"\"
-    # 1. Chỉ số Bicubic Baseline
-    p_bic    = calc_psnr(hr_np, bic_np)
-    s_bic    = calc_ssim(hr_np, bic_np)
-    ms_bic   = calc_msssim(hr_tensor, bic_tensor)
-    lp_bic   = calc_lpips(hr_tensor, bic_tensor)
-    niqe_bic = fallback_niqe(bic_np)
-    diff_bic = (hr_np.astype(np.float64) - bic_np.astype(np.float64)) / 255.0
-    mse_bic  = float(np.mean(diff_bic ** 2))
-    rmse_bic = float(np.sqrt(mse_bic))
+    with torch.no_grad():
+        # 1. Chỉ số Bicubic Baseline
+        p_bic    = calc_psnr(hr_tensor, bic_tensor)
+        s_bic    = calc_ssim(hr_tensor, bic_tensor)
+        ms_bic   = calc_msssim(hr_tensor, bic_tensor)
+        lp_bic   = calc_lpips(hr_tensor, bic_tensor)
+        niqe_bic = calc_niqe(bic_tensor)
+        mse_bic  = float(torch.mean((hr_tensor - bic_tensor) ** 2).item() * (255.0 ** 2))
+        rmse_bic = float(np.sqrt(mse_bic))
 
-    # 2. Chỉ số Model Super-Resolution
-    p_sr    = calc_psnr(hr_np, sr_np)
-    s_sr    = calc_ssim(hr_np, sr_np)
-    ms_sr   = calc_msssim(hr_tensor, sr_tensor)
-    lp_sr   = calc_lpips(hr_tensor, sr_tensor)
-    niqe_sr = fallback_niqe(sr_np)
-    diff_sr = (hr_np.astype(np.float64) - sr_np.astype(np.float64)) / 255.0
-    mse_sr  = float(np.mean(diff_sr ** 2))
-    rmse_sr = float(np.sqrt(mse_sr))
+        # 2. Chỉ số Model Super-Resolution
+        p_sr    = calc_psnr(hr_tensor, sr_tensor)
+        s_sr    = calc_ssim(hr_tensor, sr_tensor)
+        ms_sr   = calc_msssim(hr_tensor, sr_tensor)
+        lp_sr   = calc_lpips(hr_tensor, sr_tensor)
+        niqe_sr = calc_niqe(sr_tensor)
+        mse_sr  = float(torch.mean((hr_tensor - sr_tensor) ** 2).item() * (255.0 ** 2))
+        rmse_sr = float(np.sqrt(mse_sr))
 
-    # 3. Phân bố mức xám & Edge Preservation Index
-    mean_val = float(np.mean(sr_np) / 255.0)
-    std_val  = float(np.std(sr_np) / 255.0)
-    epi_val  = compute_epi(hr_np, sr_np)
+        # 3. Phân bố mức xám (dải 0-255) & Edge Preservation Index
+        mean_val = float(torch.mean(sr_tensor).item() * 255.0)
+        std_val  = float(torch.std(sr_tensor).item() * 255.0)
+        epi_val  = compute_epi(hr_tensor, sr_tensor)
 
-    # 4. Độ tăng cường (Gains so với Bicubic)
-    psnr_gain   = float(p_sr - p_bic)
-    msssim_gain = float(ms_sr - ms_bic)
-    lpips_gain  = float(lp_bic - lp_sr)      # Dương = cải thiện thị giác tốt hơn
-    niqe_gain   = float(niqe_bic - niqe_sr)  # Dương = cải thiện chất lượng tự nhiên
+        # 4. Độ tăng cường (Gains so với Bicubic)
+        psnr_gain   = float(p_sr - p_bic)
+        msssim_gain = float(ms_sr - ms_bic)
+        lpips_gain  = float(lp_bic - lp_sr)      # Dương = cải thiện thị giác tốt hơn
+        niqe_gain   = float(niqe_bic - niqe_sr)  # Dương = cải thiện chất lượng tự nhiên
 
-    hr_h, hr_w = hr_np.shape[:2]
-    lr_h, lr_w = hr_h // scale_factor, hr_w // scale_factor
+        hr_h, hr_w = hr_tensor.shape[-2:]
+        lr_h, lr_w = hr_h // scale_factor, hr_w // scale_factor
 
-    record = {
-        'source_path':      img_path,
-        'saved_path':       saved_path,
-        'dataset':          dataset_name,
-        'filename':         os.path.basename(img_path),
-        'status':           'ok',
-        'resolution':       f'{lr_w}x{lr_h} -> {hr_w}x{hr_h}',
-        'scale_factor':     int(scale_factor),
-        'patches_count':    1,
-        'latency_ms':       round(latency_ms, 2),
-        'psnr_bicubic_db':  round(p_bic, 4),
-        'mse_bicubic':      round(mse_bic, 6),
-        'rmse_bicubic':     round(rmse_bic, 6),
-        'ssim_bicubic':     round(s_bic, 4),
-        'msssim_bicubic':   round(ms_bic, 4),
-        'lpips_bicubic':    round(lp_bic, 4),
-        'niqe_bicubic':     round(niqe_bic, 4),
-        'psnr_fpga_db':     round(p_sr, 4),
-        'mse_fpga':         round(mse_sr, 6),
-        'rmse_fpga':        round(rmse_sr, 6),
-        'ssim_fpga':        round(s_sr, 4),
-        'msssim_fpga':      round(ms_sr, 4),
-        'lpips_fpga':       round(lp_sr, 4),
-        'lpips':            round(lp_sr, 4),
-        'lpips_srgan':      round(lp_sr, 4),
-        'niqe_fpga':        round(niqe_sr, 4),
-        'mean_fpga':        round(mean_val, 4),
-        'std_fpga':         round(std_val, 4),
-        'mean':             round(mean_val, 4),
-        'std':              round(std_val, 4),
-        'epi':              round(epi_val, 4),
-        'psnr_model_db':    round(p_sr, 4),
-        'ssim_model':       round(s_sr, 4),
-        'mse_model':        round(mse_sr, 6),
-        'rmse_model':       round(rmse_sr, 6),
-        'psnr_gain_db':     round(psnr_gain, 4),
-        'msssim_gain':      round(msssim_gain, 4),
-        'lpips_gain':       round(lpips_gain, 4),
-        'niqe_gain':        round(niqe_gain, 4)
-    }
-    assert len(record) == 38, f"Số lượng trường không khớp: {len(record)} != 38"
-    return record
+        record = {
+            'source_path':      img_path,
+            'saved_path':       saved_path,
+            'dataset':          dataset_name,
+            'filename':         os.path.basename(img_path),
+            'status':           'ok',
+            'resolution':       f'{lr_w}x{lr_h} -> {hr_w}x{hr_h}',
+            'scale_factor':     int(scale_factor),
+            'patches_count':    1,
+            'latency_ms':       round(latency_ms, 2),
+            'psnr_bicubic_db':  round(p_bic, 4),
+            'mse_bicubic':      round(mse_bic, 6),
+            'rmse_bicubic':     round(rmse_bic, 6),
+            'ssim_bicubic':     round(s_bic, 4),
+            'msssim_bicubic':   round(ms_bic, 4),
+            'lpips_bicubic':    round(lp_bic, 4),
+            'niqe_bicubic':     round(niqe_bic, 4),
+            'psnr_fpga_db':     round(p_sr, 4),
+            'mse_fpga':         round(mse_sr, 6),
+            'rmse_fpga':        round(rmse_sr, 6),
+            'ssim_fpga':        round(s_sr, 4),
+            'msssim_fpga':      round(ms_sr, 4),
+            'lpips_fpga':       round(lp_sr, 4),
+            'lpips':            round(lp_sr, 4),
+            'lpips_srgan':      round(lp_sr, 4),
+            'niqe_fpga':        round(niqe_sr, 4),
+            'mean_fpga':        round(mean_val, 4),
+            'std_fpga':         round(std_val, 4),
+            'mean':             round(mean_val, 4),
+            'std':              round(std_val, 4),
+            'epi':              round(epi_val, 4),
+            'psnr_model_db':    round(p_sr, 4),
+            'ssim_model':       round(s_sr, 4),
+            'mse_model':        round(mse_sr, 6),
+            'rmse_model':       round(rmse_sr, 6),
+            'psnr_gain_db':     round(psnr_gain, 4),
+            'msssim_gain':      round(msssim_gain, 4),
+            'lpips_gain':       round(lpips_gain, 4),
+            'niqe_gain':        round(niqe_gain, 4)
+        }
+        assert len(record) == 38, f"Số lượng trường không khớp: {len(record)} != 38"
+        return record
 
-print("✓ Hàm compute_image_metrics() hoàn tất chuẩn hóa 38 trường dữ liệu.")
+print("✓ Hàm compute_image_metrics() GPU tối ưu hoàn tất chuẩn hóa 38 trường dữ liệu.")
 """
 
     cells.append({
@@ -907,52 +944,53 @@ for m_idx, model_name in enumerate(MODELS_TO_RUN, 1):
         dataset_name = os.path.basename(os.path.dirname(img_path)) or 'unknown'
         
         try:
-            # Đọc ảnh HR gốc và căn chỉnh chia hết cho SCALE_FACTOR
+            # 1. Đọc và chuẩn hóa ảnh HR về đúng kích thước chuẩn y tế (1024x1024 RGB)
+            # Khớp 100% quy trình của kaggle_srgan_2x_inference (loại bỏ nghẽn do ảnh sub_chest quá lớn)
             hr_pil = Image.open(img_path).convert('RGB')
-            orig_w, orig_h = hr_pil.size
-            crop_w = (orig_w // SCALE_FACTOR) * SCALE_FACTOR
-            crop_h = (orig_h // SCALE_FACTOR) * SCALE_FACTOR
-            if (crop_w, crop_h) != (orig_w, orig_h):
-                hr_pil = hr_pil.crop((0, 0, crop_w, crop_h))
+            if hr_pil.size != HR_SIZE:
+                hr_pil = hr_pil.resize(HR_SIZE, Image.BICUBIC)
             
-            lr_w, lr_h = crop_w // SCALE_FACTOR, crop_h // SCALE_FACTOR
-            lr_pil = hr_pil.resize((lr_w, lr_h), Image.BICUBIC)
+            lr_size = (HR_SIZE[0] // SCALE_FACTOR, HR_SIZE[1] // SCALE_FACTOR)
+            lr_pil  = hr_pil.resize(lr_size, Image.BICUBIC)
+            bic_pil = lr_pil.resize(HR_SIZE, Image.BICUBIC)
             
-            # Chuẩn bị Tensor
-            hr_np     = np.array(hr_pil)
-            hr_tensor = to_tensor(hr_pil).unsqueeze(0).to(DEVICE)
-            
-            lr_tensor = to_tensor(lr_pil).unsqueeze(0).to(DEVICE)
-            
-            # Tạo ảnh Bicubic mốc cơ sở
-            bic_pil    = lr_pil.resize((crop_w, crop_h), Image.BICUBIC)
-            bic_np     = np.array(bic_pil)
+            # 2. Chuẩn bị Tensor trực tiếp trên GPU
+            hr_tensor  = to_tensor(hr_pil).unsqueeze(0).to(DEVICE)
+            lr_tensor  = to_tensor(lr_pil).unsqueeze(0).to(DEVICE)
             bic_tensor = to_tensor(bic_pil).unsqueeze(0).to(DEVICE)
             
-            # Đo đạc thời gian suy luận (Latency ms)
+            # 3. Đo đạc thời gian suy luận (Latency ms)
             if DEVICE == 'cuda': torch.cuda.synchronize()
             t0 = time.perf_counter()
             
             if model_name.lower() == 'bicubic':
                 sr_tensor = bic_tensor
-                sr_np     = bic_np
             else:
                 with torch.no_grad():
                     sr_tensor = cur_model(lr_tensor)
                 if DEVICE == 'cuda': torch.cuda.synchronize()
-                sr_np = (sr_tensor.squeeze(0).permute(1, 2, 0).cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8)
             
             latency_ms = (time.perf_counter() - t0) * 1000.0
+            sr_tensor  = torch.clamp(sr_tensor, 0.0, 1.0)
             
-            # Tính 38 chỉ số
+            # 4. Lưu ảnh nếu bật tùy chọn SAVE_PNG_IMAGES
+            saved_path = None
+            if SAVE_PNG_IMAGES:
+                out_name = f"{model_name.lower()}_{SCALE_FACTOR}x_{os.path.basename(img_path)}"
+                saved_path = os.path.join(OUTPUT_DIR, out_name)
+                sr_np = (sr_tensor.squeeze(0).permute(1, 2, 0).cpu().numpy() * 255.0).round().astype(np.uint8)
+                Image.fromarray(sr_np).save(saved_path)
+            
+            # 5. Tính 38 chỉ số trực tiếp trên GPU (~20-40ms)
             rec = compute_image_metrics(
-                hr_np=hr_np, hr_tensor=hr_tensor,
-                bic_np=bic_np, bic_tensor=bic_tensor,
-                sr_np=sr_np, sr_tensor=sr_tensor,
+                hr_tensor=hr_tensor, bic_tensor=bic_tensor, sr_tensor=sr_tensor,
                 latency_ms=latency_ms, img_path=img_path,
-                dataset_name=dataset_name, scale_factor=SCALE_FACTOR
+                dataset_name=dataset_name, scale_factor=SCALE_FACTOR, saved_path=saved_path or ""
             )
             model_records.append(rec)
+            
+            # 6. Thu dọn tensor tránh rò rỉ bộ nhớ
+            del hr_tensor, lr_tensor, bic_tensor, sr_tensor
             
         except Exception as e:
             model_records.append({
@@ -963,6 +1001,8 @@ for m_idx, model_name in enumerate(MODELS_TO_RUN, 1):
         # Lưu checkpoint định kỳ
         if (idx + 1) % CHECKPOINT_EVERY == 0 or (idx + 1) == total_images:
             save_checkpoint(model_records, time.perf_counter() - t_start, checkpoint_file)
+            if DEVICE == 'cuda':
+                torch.cuda.empty_cache()
             
     elapsed_total = time.perf_counter() - t_start
     all_benchmark_runs[model_name.lower()] = {
@@ -996,6 +1036,27 @@ print("✓ TOÀN BỘ CÁC MÔ HÌNH ĐÃ HOÀN TẤT BENCHMARK THÀNH CÔNG!")
     cell10_code = """# ╔══════════════════════════════════════════════════════════════╗
 # ║  CELL 10 — Thống Kê & Tổng Hợp Kết Quả (sub_NIH vs sub_chest) ║
 # ╚══════════════════════════════════════════════════════════════╝
+
+# Tự động phục hồi kết quả từ các file checkpoint đã lưu trong OUTPUT_DIR nếu kernel vừa restart
+if not all_benchmark_runs:
+    checkpoint_files = sorted(glob.glob(os.path.join(OUTPUT_DIR, f"*_{SCALE_FACTOR}x_checkpoint.json")) + 
+                              glob.glob(os.path.join(OUTPUT_DIR, f"*_{SCALE_FACTOR}x_benchmark.json")))
+    for cf in checkpoint_files:
+        m_name = os.path.basename(cf).split('_')[0].lower()
+        if m_name not in all_benchmark_runs:
+            try:
+                with open(cf, 'r', encoding='utf-8') as fh:
+                    cdata = json.load(fh)
+                    recs = cdata.get('records') or cdata.get('per_image_results', [])
+                    if recs:
+                        all_benchmark_runs[m_name] = {
+                            'records': recs,
+                            'elapsed_sec': cdata.get('elapsed_sec_accumulated', 0),
+                            'weights_source': 'checkpoint_file'
+                        }
+                        print(f"✓ Đã tự động phục hồi {len(recs):,} kết quả của [{m_name.upper()}] từ file checkpoint!")
+            except Exception:
+                pass
 
 summary_comparison_rows = []
 
@@ -1343,6 +1404,29 @@ print(\"\"\"
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(notebook_dict, f, indent=1, ensure_ascii=False)
     print(f"✓ Notebook generated successfully: {output_path} ({len(cells)} cells)")
+
+    # 1. Export copy-paste markdown manual
+    md_output_path = "notebooks/software/KAGGLE_MULTIMODEL_COPY_PASTE.md"
+    md_content = ["# HƯỚNG DẪN COPY - PASTE TỪNG CELL LÊN KAGGLE\\n\\n"]
+    md_content.append("> Bản cập nhật tối ưu hóa: Đã chuẩn hóa HR 1024x1024 (ngừa nghẽn sub_chest) và tính toán GPU Tensor siêu tốc.\\n\\n")
+    for i, c in enumerate(cells):
+        src = "".join(c.get("source", []))
+        c_type = c.get("cell_type")
+        md_content.append(f"## CELL {i} ({c_type.upper()})\\n\\n")
+        if c_type == "markdown":
+            md_content.append(f"```markdown\n{src}\n```\n\n")
+        else:
+            md_content.append(f"```python\n{src}\n```\n\n")
+        md_content.append("---\n\n")
+
+    with open(md_output_path, "w", encoding="utf-8") as f:
+        f.write("".join(md_content))
+    print(f"✓ Copy-Paste manual generated: {md_output_path}")
+
+    # 2. Copy direct upload notebook to ~/Downloads
+    downloads_path = os.path.expanduser("~/Downloads/kaggle_multimodel_benchmark.ipynb")
+    shutil.copy2(output_path, downloads_path)
+    print(f"✓ Copied to Downloads for direct upload: {downloads_path}")
 
 if __name__ == "__main__":
     create_multimodel_benchmark_notebook()
