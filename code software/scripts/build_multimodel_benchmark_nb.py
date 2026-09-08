@@ -1217,6 +1217,10 @@ for ef in exported_files:
 # ║  CELL 12 — Biểu Đồ So Sánh & Luận Chứng Khoa Học Lựa Chọn SRGAN║
 # ╚══════════════════════════════════════════════════════════════╝
 
+import matplotlib as mpl
+mpl.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Liberation Sans', 'Arial', 'sans-serif']
+mpl.rcParams['axes.unicode_minus'] = False
+
 fig, axes = plt.subplots(2, 2, figsize=(18, 14))
 plt.subplots_adjust(hspace=0.35, wspace=0.25)
 if sns is not None:
@@ -1237,14 +1241,14 @@ for idx, row in df_summary.iterrows():
     offset_y = 0.005 if m != 'SRGAN' else -0.010
     ax1.annotate(m, (x, y + offset_y), fontsize=11, fontweight='bold', ha='center')
 
-ax1.set_title(f"1. Perception vs Distortion (Scale {SCALE_FACTOR}x)\\n[Trọng tâm luận chứng lựa chọn SRGAN]", fontsize=13, fontweight='bold')
-ax1.set_xlabel("PSNR (dB) — Độ méo ảnh (Cao hơn = Khớp pixel tốt hơn)", fontsize=11)
-ax1.set_ylabel("LPIPS (AlexNet) — Cảm thụ thị giác (Thấp hơn = Sắc nét hơn)", fontsize=11)
+ax1.set_title(f"1. Perception vs. Distortion Trade-off (Scale {SCALE_FACTOR}x)\\n[Core Justification for SRGAN: Lower LPIPS = Better Perception]", fontsize=12, fontweight='bold')
+ax1.set_xlabel("Distortion: PSNR (dB) [Higher = Better Pixel Match]", fontsize=10)
+ax1.set_ylabel("Perception: LPIPS (AlexNet) [Lower = Sharper/Real Textures]", fontsize=10)
 ax1.grid(True, linestyle='--', alpha=0.6)
 
 # Tô vùng tối ưu thị giác
-ax1.axhline(y=df_summary['LPIPS ↓'].min() * 1.15, color='green', linestyle=':', alpha=0.5, label='Vùng sắc nét thị giác cao')
-ax1.legend(loc='upper right')
+ax1.axhline(y=df_summary['LPIPS ↓'].min() * 1.15, color='green', linestyle=':', alpha=0.6, label='Superior Perceptual Quality Zone')
+ax1.legend(loc='upper right', framealpha=0.9)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Đồ thị 2: Speed vs Quality (FPS vs PSNR) — Phân tích thực thi
@@ -1258,9 +1262,9 @@ for idx, row in df_summary.iterrows():
     ax2.scatter(x, y, color=c, s=180, edgecolors='black', linewidth=1.5, zorder=5)
     ax2.annotate(m, (x, y + 0.3), fontsize=11, fontweight='bold', ha='center')
 
-ax2.set_title(f"2. Speed vs Quality Trade-off (FPS vs PSNR)\\n[Cơ sở đề xuất tăng tốc phần cứng FPGA]", fontsize=13, fontweight='bold')
-ax2.set_xlabel("Thông lượng (Throughput FPS) — Cao hơn = Nhanh hơn", fontsize=11)
-ax2.set_ylabel("PSNR (dB)", fontsize=11)
+ax2.set_title(f"2. Speed vs. Quality Trade-off (FPS vs PSNR)\\n[Motivation for FPGA Hardware Acceleration]", fontsize=12, fontweight='bold')
+ax2.set_xlabel("Throughput (FPS) [Higher = Faster Inference]", fontsize=10)
+ax2.set_ylabel("PSNR (dB)", fontsize=10)
 ax2.grid(True, linestyle='--', alpha=0.6)
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1268,8 +1272,8 @@ ax2.grid(True, linestyle='--', alpha=0.6)
 # ─────────────────────────────────────────────────────────────────────────────
 ax3 = axes[1, 0]
 bars = ax3.bar(df_summary['Model'], df_summary['LPIPS ↓'], color=colors, edgecolor='black', linewidth=1.2)
-ax3.set_title(f"3. Xếp Hạng Sai Lệch Thị Giác LPIPS (Scale {SCALE_FACTOR}x)\\n(Càng thấp càng rõ nét vi cấu trúc giải phẫu)", fontsize=13, fontweight='bold')
-ax3.set_ylabel("LPIPS Index", fontsize=11)
+ax3.set_title(f"3. Perceptual Loss Ranking: LPIPS (Scale {SCALE_FACTOR}x)\\n[Lower is Better - Preserves Anatomical Textures]", fontsize=12, fontweight='bold')
+ax3.set_ylabel("LPIPS Index", fontsize=10)
 ax3.grid(axis='y', linestyle='--', alpha=0.6)
 for bar in bars:
     yval = bar.get_height()
@@ -1280,14 +1284,14 @@ for bar in bars:
 # ─────────────────────────────────────────────────────────────────────────────
 ax4 = axes[1, 1]
 bars_p = ax4.bar(df_summary['Model'], df_summary['PSNR Gain (dB)'], color=colors, edgecolor='black', linewidth=1.2)
-ax4.set_title(f"4. Tăng Trưởng PSNR so với Bicubic Baseline (Scale {SCALE_FACTOR}x)\\n(dB cải thiện so với ảnh nội suy gốc)", fontsize=13, fontweight='bold')
-ax4.set_ylabel("PSNR Gain (dB)", fontsize=11)
+ax4.set_title(f"4. PSNR Improvement over Bicubic Baseline (Scale {SCALE_FACTOR}x)\\n[dB Gain over Bicubic Interpolation]", fontsize=12, fontweight='bold')
+ax4.set_ylabel("PSNR Gain (dB)", fontsize=10)
 ax4.grid(axis='y', linestyle='--', alpha=0.6)
 for bar in bars_p:
     yval = bar.get_height()
     ax4.text(bar.get_x() + bar.get_width()/2.0, yval + 0.1, f"+{yval:.2f}" if yval >= 0 else f"{yval:.2f}", ha='center', va='bottom', fontsize=9, fontweight='bold')
 
-plt.suptitle(f"BÁO CÁO ĐỐI CHUẨN ĐA MÔ HÌNH TRÊN TẬP ẢNH X-RAY (SCALE {SCALE_FACTOR}×)", fontsize=16, fontweight='bold', y=0.98)
+plt.suptitle(f"SCIENTIFIC MULTI-MODEL BENCHMARK ON CHEST X-RAY (SCALE {SCALE_FACTOR}x)\\nTrade-off Analysis & Justification for SRGAN", fontsize=15, fontweight='bold', y=0.98)
 chart_out_path = os.path.join(OUTPUT_DIR, f"multimodel_{SCALE_FACTOR}x_tradeoff_charts.png")
 plt.savefig(chart_out_path, dpi=300, bbox_inches='tight')
 plt.show()
