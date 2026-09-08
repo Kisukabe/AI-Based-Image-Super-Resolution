@@ -190,6 +190,9 @@ print(f"📂 Thư mục trọng số chính thức: {{WEIGHT_ROOT_DIR}}")
 # ║  CELL 2 — Khởi Tạo Thiết Bị & Bộ Hàm Đo Tối Ưu Hóa GPU CUDA ║
 # ╚══════════════════════════════════════════════════════════════╝
 
+import os
+import sys
+import glob
 import time
 import json
 import math
@@ -331,6 +334,14 @@ print("✓ Bộ hàm đo khoa học GPU tối ưu đã sẵn sàng: PSNR, SSIM, 
 # ║  CELL 3 — Kiến Trúc Mô Hình {m_upper:<10} & Bộ Nạp Trọng Số    ║
 # ╚══════════════════════════════════════════════════════════════╝
 
+import os
+import sys
+import glob
+import math
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
 class SRCNN(nn.Module):
     def __init__(self, in_channels=3, upscale_factor=4):
         super(SRCNN, self).__init__()
@@ -348,7 +359,7 @@ class SRCNN(nn.Module):
         out = self.relu1(self.conv1(x_bicubic))
         out = self.relu2(self.conv2(out))
         out = self.conv3(out)
-        return out
+        return torch.clamp(out, 0.0, 1.0)
 
 
 class ESPCN(nn.Module):
@@ -366,7 +377,7 @@ class ESPCN(nn.Module):
         out = self.tanh1(self.conv1(x))
         out = self.tanh2(self.conv2(out))
         out = self.pixel_shuffle(self.conv3(out))
-        return out
+        return torch.clamp(out, 0.0, 1.0)
 
 
 class FSRCNN(nn.Module):
@@ -390,7 +401,7 @@ class FSRCNN(nn.Module):
             nn.Conv2d(s, d, kernel_size=1),
             nn.PReLU(d)
         )
-        self.deconvolution = nn.ConvTranspose2d(
+        self.deconv = nn.ConvTranspose2d(
             d, in_channels, kernel_size=9,
             stride=upscale_factor, padding=4,
             output_padding=upscale_factor - 1
@@ -401,8 +412,8 @@ class FSRCNN(nn.Module):
         out = self.shrinking(out)
         out = self.mapping(out)
         out = self.expanding(out)
-        out = self.deconvolution(out)
-        return out
+        out = self.deconv(out)
+        return torch.clamp(out, 0.0, 1.0)
 
 
 class ConvBlock(nn.Module):
@@ -414,7 +425,7 @@ class ConvBlock(nn.Module):
         return self.relu(self.conv(x))
 
 class VDSR(nn.Module):
-    def __init__(self, in_channels=3, upscale_factor=4, num_layers=20, num_features=64, style='modular'):
+    def __init__(self, in_channels=3, upscale_factor=4, num_layers=20, num_features=64, style='sequential'):
         super(VDSR, self).__init__()
         self.upscale_factor = upscale_factor
         self.style = style
@@ -426,8 +437,10 @@ class VDSR(nn.Module):
             layers.append(nn.Conv2d(num_features, in_channels, kernel_size=3, padding=1, bias=True))
             self.residual_net = nn.Sequential(*layers)
         else:
-            self.conv_first = nn.Conv2d(in_channels, num_features, kernel_size=3, padding=1, bias=False)
-            self.relu_first = nn.ReLU(inplace=True)
+            self.conv_first = nn.Sequential(
+                nn.Conv2d(in_channels, num_features, kernel_size=3, padding=1, bias=False),
+                nn.ReLU(inplace=True)
+            )
             self.residual_layers = nn.ModuleList([
                 ConvBlock(num_features, num_features) for _ in range(num_layers - 2)
             ])
@@ -438,32 +451,34 @@ class VDSR(nn.Module):
         if self.style == 'sequential':
             residual = self.residual_net(x_bicubic)
         else:
-            out = self.relu_first(self.conv_first(x_bicubic))
+            out = self.conv_first(x_bicubic)
             for layer in self.residual_layers:
                 out = layer(out)
             residual = self.conv_last(out)
-        return x_bicubic + residual
+        return torch.clamp(x_bicubic + residual, 0.0, 1.0)
 
 
-class ResidualBlock(nn.Module):
-    def __init__(self, n_feats, kernel_size=3, res_scale=0.1):
-        super(ResidualBlock, self).__init__()
+class EDSRResBlock(nn.Module):
+    def __init__(self, n_feats=64, res_scale=0.1):
+        super(EDSRResBlock, self).__init__()
         self.res_scale = res_scale
-        self.conv1 = nn.Conv2d(n_feats, n_feats, kernel_size, padding=kernel_size//2)
-        self.relu = nn.ReLU(inplace=True)
-        self.conv2 = nn.Conv2d(n_feats, n_feats, kernel_size, padding=kernel_size//2)
+        self.body = nn.Sequential(
+            nn.Conv2d(n_feats, n_feats, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(n_feats, n_feats, kernel_size=3, padding=1)
+        )
+
     def forward(self, x):
-        res = self.conv2(self.relu(self.conv1(x)))
-        return x + res * self.res_scale
+        return x + self.body(x) * self.res_scale
 
 class EDSR(nn.Module):
     def __init__(self, in_channels=3, upscale_factor=4, n_feats=64, n_resblocks=8, res_scale=0.1):
         super(EDSR, self).__init__()
         self.upscale_factor = upscale_factor
         self.head = nn.Conv2d(in_channels, n_feats, kernel_size=3, padding=1)
-        self.body = nn.Sequential(*[
-            ResidualBlock(n_feats, kernel_size=3, res_scale=res_scale) for _ in range(n_resblocks)
-        ])
+        self.body = nn.Sequential(*[EDSRResBlock(n_feats, res_scale) for _ in range(n_resblocks)])
+        self.body_conv = nn.Conv2d(n_feats, n_feats, kernel_size=3, padding=1)
+
         if upscale_factor == 2:
             self.tail = nn.Sequential(
                 nn.Conv2d(n_feats, n_feats * 4, kernel_size=3, padding=1),
@@ -487,69 +502,67 @@ class EDSR(nn.Module):
 
     def forward(self, x):
         x_head = self.head(x)
-        res = self.body(x_head)
+        res = self.body_conv(self.body(x_head))
         res = res + x_head
-        if hasattr(self, 'upsampler'):
-            out = self.upsampler(res)
-            out = self.tail(out)
-        else:
+        if self.upscale_factor == 2:
             out = self.tail(res)
-        return out
+        else:
+            out = self.tail(self.upsampler(res))
+        return torch.clamp(out, 0.0, 1.0)
 
 
-class ResidualBlockSRGAN(nn.Module):
-    def __init__(self, channels):
-        super(ResidualBlockSRGAN, self).__init__()
-        self.conv1 = nn.Conv2d(channels, channels, kernel_size=3, padding=1)
+class SRGANResidualBlock(nn.Module):
+    def __init__(self, channels=64):
+        super(SRGANResidualBlock, self).__init__()
+        self.conv1 = nn.Conv2d(channels, channels, kernel_size=3, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(channels)
-        self.prelu = nn.PReLU()
-        self.conv2 = nn.Conv2d(channels, channels, kernel_size=3, padding=1)
+        self.prelu = nn.PReLU(num_parameters=channels)
+        self.conv2 = nn.Conv2d(channels, channels, kernel_size=3, padding=1, bias=False)
         self.bn2 = nn.BatchNorm2d(channels)
+
     def forward(self, x):
-        residual = self.conv1(x)
-        residual = self.bn1(residual)
-        residual = self.prelu(residual)
-        residual = self.conv2(residual)
-        residual = self.bn2(residual)
+        residual = self.prelu(self.bn1(self.conv1(x)))
+        residual = self.bn2(self.conv2(residual))
         return x + residual
 
 class SRGAN(nn.Module):
     def __init__(self, in_channels=3, num_channels=64, num_blocks=16, upscale_factor=4):
         super(SRGAN, self).__init__()
         self.upscale_factor = upscale_factor
-        self.conv1 = nn.Conv2d(in_channels, num_channels, kernel_size=9, padding=4)
-        self.prelu = nn.PReLU()
-        self.residual_blocks = nn.Sequential(*[
-            ResidualBlockSRGAN(num_channels) for _ in range(num_blocks)
-        ])
-        self.conv2 = nn.Conv2d(num_channels, num_channels, kernel_size=3, padding=1)
-        self.bn = nn.BatchNorm2d(num_channels)
+        self.initial = nn.Sequential(
+            nn.Conv2d(in_channels, num_channels, kernel_size=9, padding=4),
+            nn.PReLU(num_parameters=num_channels)
+        )
+        self.residual = nn.Sequential(*[SRGANResidualBlock(num_channels) for _ in range(num_blocks)])
+        self.mid_conv = nn.Sequential(
+            nn.Conv2d(num_channels, num_channels, kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(num_channels)
+        )
         if upscale_factor in [2, 4]:
             num_stages = int(math.log2(upscale_factor))
-            upsample_layers = []
+            stages = []
             for _ in range(num_stages):
-                upsample_layers.extend([
+                stages.extend([
                     nn.Conv2d(num_channels, num_channels * 4, kernel_size=3, padding=1),
                     nn.PixelShuffle(2),
-                    nn.PReLU()
+                    nn.PReLU(num_parameters=num_channels)
                 ])
-            self.upsample = nn.Sequential(*upsample_layers)
-        elif upscale_factor == 3:
-            self.upsample = nn.Sequential(
+            self.upsampler = nn.Sequential(*stages)
+        else: # 3x
+            self.upsampler = nn.Sequential(
                 nn.Conv2d(num_channels, num_channels * (upscale_factor ** 2), kernel_size=3, padding=1),
                 nn.PixelShuffle(upscale_factor),
-                nn.PReLU()
+                nn.PReLU(num_parameters=num_channels)
             )
-        self.conv3 = nn.Conv2d(num_channels, in_channels, kernel_size=9, padding=4)
+        self.final_conv = nn.Conv2d(num_channels, in_channels, kernel_size=9, padding=4)
 
     def forward(self, x):
-        out1 = self.prelu(self.conv1(x))
-        out = self.residual_blocks(out1)
-        out = self.bn(self.conv2(out))
-        out = out1 + out
-        out = self.upsample(out)
-        out = self.conv3(out)
-        return out
+        initial = self.initial(x)
+        res = self.residual(initial)
+        mid = self.mid_conv(res) + initial
+        up = self.upsampler(mid)
+        out = (torch.tanh(self.final_conv(up)) + 1.0) / 2.0
+        return torch.clamp(out, 0.0, 1.0)
 
 
 def load_target_model(upscale_factor: int, weight_root: str = WEIGHT_ROOT_DIR, device: str = DEVICE):
@@ -571,7 +584,7 @@ def load_target_model(upscale_factor: int, weight_root: str = WEIGHT_ROOT_DIR, d
                 state_dict = state_dict[k]
                 break
 
-    clean_state = {{}}
+    clean_state = dict()
     for k, v in state_dict.items():
         clean_k = k.replace('module.', '').replace('generator.', '').replace('netG.', '')
         clean_state[clean_k] = v
