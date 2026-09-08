@@ -93,9 +93,8 @@ def generate_notebook_for_model(model_info):
 | **Cell 8** | **Vòng lặp Benchmark tuần tự 3 tỉ lệ (2× $\\rightarrow$ 3× $\\rightarrow$ 4×)** |
 | **Cell 9** | Thống kê tổng hợp và đối sánh giữa các Scale |
 | **Cell 10** | Xuất file kết quả JSON & CSV chuẩn hóa |
-| **Cell 11** | Biểu đồ phân tích chất lượng & suy giảm theo Scale |
-| **Cell 12** | Đóng gói toàn bộ kết quả vào file ZIP tải về |
-| **Cell 13** | Giải phóng tài nguyên VRAM |
+| **Cell 11** | Đóng gói toàn bộ kết quả vào file ZIP tải về |
+| **Cell 12** | Giải phóng tài nguyên VRAM |
 """
 
     cells.append({
@@ -199,12 +198,6 @@ import gc
 import warnings
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib as mpl
-try:
-    import seaborn as sns
-except ImportError:
-    sns = None
 from PIL import Image
 from tqdm import tqdm
 
@@ -217,9 +210,6 @@ from skimage.metrics import peak_signal_noise_ratio as psnr_fn
 from skimage.metrics import structural_similarity as ssim_fn
 
 warnings.filterwarnings('ignore')
-
-mpl.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Liberation Sans', 'Arial', 'sans-serif']
-mpl.rcParams['axes.unicode_minus'] = False
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 if DEVICE == 'cuda':
@@ -1195,73 +1185,29 @@ for ef in exported_files:
     })
 
     # =========================================================================
-    # CELL 11: Code - Scale Trade-off Charts
+    # CELL 11: Code - Packaging & Zip
     # =========================================================================
     cell11_code = f"""# ╔══════════════════════════════════════════════════════════════╗
-# ║  CELL 11 — Biểu Đồ Phân Tích Hiệu Năng {m_upper} Theo Scale   ║
+# ║  CELL 11 — Đóng Gói File ZIP Kết Quả Cho {m_upper:<10}         ║
 # ╚══════════════════════════════════════════════════════════════╝
 
-fig, axes = plt.subplots(2, 2, figsize=(16, 12))
-plt.subplots_adjust(hspace=0.35, wspace=0.25)
+zip_out_name = "{m_key}_benchmark_results.zip"
+zip_out_path = os.path.join('/kaggle/working', zip_out_name)
 
-scale_labels = [f"{{s}}x" for s in df_scale_summary['Scale']]
-chart_colors = ['#1f77b4', '#ff7f0e', '#2ca02c']
+if os.path.exists(zip_out_path):
+    os.remove(zip_out_path)
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Đồ thị 1: PSNR across Scales
-# ─────────────────────────────────────────────────────────────────────────────
-ax1 = axes[0, 0]
-bars1 = ax1.bar(df_scale_summary['Scale'], df_scale_summary['PSNR (dB)'], color=chart_colors[:len(df_scale_summary)], edgecolor='black', linewidth=1.2, width=0.5)
-ax1.set_title("1. Distortion: PSNR (dB) across Scales\\n[Higher is Better]", fontsize=12, fontweight='bold')
-ax1.set_ylabel("PSNR (dB)", fontsize=10)
-ax1.set_ylim(bottom=max(0, df_scale_summary['PSNR (dB)'].min() - 5))
-ax1.grid(axis='y', linestyle='--', alpha=0.6)
-for b in bars1:
-    yval = b.get_height()
-    ax1.text(b.get_x() + b.get_width()/2.0, yval + 0.3, f"{{yval:.2f}} dB", ha='center', va='bottom', fontsize=10, fontweight='bold')
+cmd = f"cd {{OUTPUT_DIR}} && zip -r '{{zip_out_path}}' . -i '*{m_key}*'"
+os.system(cmd)
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Đồ thị 2: LPIPS across Scales
-# ─────────────────────────────────────────────────────────────────────────────
-ax2 = axes[0, 1]
-bars2 = ax2.bar(df_scale_summary['Scale'], df_scale_summary['LPIPS ↓'], color=chart_colors[:len(df_scale_summary)], edgecolor='black', linewidth=1.2, width=0.5)
-ax2.set_title("2. Perceptual Loss: LPIPS across Scales\\n[Lower is Better - Finer Detail]", fontsize=12, fontweight='bold')
-ax2.set_ylabel("LPIPS Index", fontsize=10)
-ax2.grid(axis='y', linestyle='--', alpha=0.6)
-for b in bars2:
-    yval = b.get_height()
-    ax2.text(b.get_x() + b.get_width()/2.0, yval + 0.005, f"{{yval:.4f}}", ha='center', va='bottom', fontsize=10, fontweight='bold')
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Đồ thị 3: Latency & Throughput (FPS)
-# ─────────────────────────────────────────────────────────────────────────────
-ax3 = axes[1, 0]
-bars3 = ax3.bar(df_scale_summary['Scale'], df_scale_summary['FPS'], color=chart_colors[:len(df_scale_summary)], edgecolor='black', linewidth=1.2, width=0.5)
-ax3.set_title("3. Inference Throughput (FPS) across Scales\\n[Higher is Faster]", fontsize=12, fontweight='bold')
-ax3.set_ylabel("Throughput (FPS)", fontsize=10)
-ax3.grid(axis='y', linestyle='--', alpha=0.6)
-for b in bars3:
-    yval = b.get_height()
-    ax3.text(b.get_x() + b.get_width()/2.0, yval + 0.5, f"{{yval:.1f}} FPS", ha='center', va='bottom', fontsize=10, fontweight='bold')
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Đồ thị 4: PSNR Gain over Bicubic
-# ─────────────────────────────────────────────────────────────────────────────
-ax4 = axes[1, 1]
-bars4 = ax4.bar(df_scale_summary['Scale'], df_scale_summary['PSNR Gain (dB)'], color=chart_colors[:len(df_scale_summary)], edgecolor='black', linewidth=1.2, width=0.5)
-ax4.set_title("4. PSNR Gain over Bicubic Baseline (dB)\\n[dB Improvement]", fontsize=12, fontweight='bold')
-ax4.set_ylabel("PSNR Gain (dB)", fontsize=10)
-ax4.grid(axis='y', linestyle='--', alpha=0.6)
-for b in bars4:
-    yval = b.get_height()
-    ax4.text(b.get_x() + b.get_width()/2.0, yval + 0.1, f"+{{yval:.2f}} dB" if yval >= 0 else f"{{yval:.2f}} dB", ha='center', va='bottom', fontsize=10, fontweight='bold')
-
-plt.suptitle(f"{m_upper} MULTI-SCALE PERFORMANCE ANALYSIS (2x, 3x, 4x)", fontsize=15, fontweight='bold', y=0.98)
-chart_out_path = os.path.join(OUTPUT_DIR, f"{m_key}_multiscale_tradeoff_charts.png")
-plt.savefig(chart_out_path, dpi=300, bbox_inches='tight')
-plt.show()
-
-print(f"✓ Đã lưu biểu đồ phân tích hiệu năng đa tỉ lệ tại: {{chart_out_path}}")
+if os.path.exists(zip_out_path):
+    sz_mb = os.path.getsize(zip_out_path) / (1024 * 1024)
+    print("═" * 70)
+    print(f"🎉 ĐÃ ĐÓNG GÓI THÀNH CÔNG: {{zip_out_name}} ({{sz_mb:.2f}} MB)")
+    print("👉 Tải file này từ tab 'Output' bên phải giao diện Kaggle.")
+    print("═" * 70)
+else:
+    print("⚠ Chưa tạo được file zip, các file kết quả vẫn nằm nguyên tại:", OUTPUT_DIR)
 """
 
     cells.append({
@@ -1273,44 +1219,10 @@ print(f"✓ Đã lưu biểu đồ phân tích hiệu năng đa tỉ lệ tại:
     })
 
     # =========================================================================
-    # CELL 12: Code - Packaging & Zip
+    # CELL 12: Code - Cleanup & Next Steps
     # =========================================================================
     cell12_code = f"""# ╔══════════════════════════════════════════════════════════════╗
-# ║  CELL 12 — Đóng Gói File ZIP Kết Quả Cho {m_upper:<10}         ║
-# ╚══════════════════════════════════════════════════════════════╝
-
-zip_out_name = f"{m_key}_benchmark_results.zip"
-zip_out_path = os.path.join('/kaggle/working', zip_out_name)
-
-if os.path.exists(zip_out_path):
-    os.remove(zip_out_path)
-
-cmd = f"cd {{OUTPUT_DIR}} && zip -r {{zip_out_path}} . -i '*{m_key}*'"
-os.system(cmd)
-
-if os.path.exists(zip_out_path):
-    sz_mb = os.path.getsize(zip_out_path) / (1024 * 1024)
-    print("═" * 70)
-    print(f"🎉 ĐÃ ĐÓNG GÓI THÀNH CÔNG: {{zip_out_name}} ({{sz_mb:.2f}} MB)")
-    print(f"👉 Tải file này từ tab 'Output' bên phải giao diện Kaggle.")
-    print("═" * 70)
-else:
-    print("⚠ Chưa tạo được file zip, các file kết quả vẫn nằm nguyên tại:", OUTPUT_DIR)
-"""
-
-    cells.append({
-        "cell_type": "code",
-        "execution_count": None,
-        "metadata": {},
-        "outputs": [],
-        "source": [line + "\n" for line in cell12_code.split("\n")]
-    })
-
-    # =========================================================================
-    # CELL 13: Code - Cleanup & Next Steps
-    # =========================================================================
-    cell13_code = f"""# ╔══════════════════════════════════════════════════════════════╗
-# ║  CELL 13 — Giải Phóng VRAM & Hướng Dẫn Đồng Bộ Local         ║
+# ║  CELL 12 — Giải Phóng VRAM & Hướng Dẫn Đồng Bộ Local         ║
 # ╚══════════════════════════════════════════════════════════════╝
 
 gc.collect()
@@ -1338,7 +1250,7 @@ print(f\"\"\"
         "execution_count": None,
         "metadata": {},
         "outputs": [],
-        "source": [line + "\n" for line in cell13_code.split("\n")]
+        "source": [line + "\n" for line in cell12_code.split("\n")]
     })
 
     # Notebook structure

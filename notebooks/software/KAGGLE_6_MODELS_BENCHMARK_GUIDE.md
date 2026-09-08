@@ -21,7 +21,7 @@ Tất cả 6 file đã được tạo sẵn trong thư mục dự án và sao ch
 
 ## 2. Quy Trình Chạy Trên Kaggle
 
-Mỗi notebook hoạt động độc lập theo quy trình 14 cell chuẩn:
+Mỗi notebook hoạt động độc lập theo quy trình 13 cell chuẩn (1 Markdown + 12 Code cells, không vẽ biểu đồ đồ họa):
 1. **Cell 1**: Tự động cài thư viện đo nhận thức (`lpips`, `pytorch-msssim`, `pyiqa`) & nạp trọng số tương ứng từ repo GitHub `Kisukabe/AI-Based-Image-Super-Resolution`.
 2. **Cell 2**: Khởi tạo thiết bị GPU CUDA và bộ hàm tính toán 7 metric trực tiếp trên GPU Tensor (chạy siêu tốc < 1ms/ảnh).
 3. **Cell 3**: Nạp kiến trúc mô hình tương ứng và bộ nạp trọng số tự động.
@@ -33,11 +33,10 @@ Mỗi notebook hoạt động độc lập theo quy trình 14 cell chuẩn:
    * Chạy xong 2.200 ảnh Scale **2×** $\rightarrow$ Lưu checkpoint & xuất file JSON/CSV.
    * Chuyển sang Scale **3×** $\rightarrow$ Lưu checkpoint & xuất file JSON/CSV.
    * Chuyển sang Scale **4×** $\rightarrow$ Lưu checkpoint & xuất file JSON/CSV.
-9. **Cell 9**: Thống kê so sánh hiệu năng của mô hình qua 3 Scale (PSNR, SSIM, LPIPS, NIQE, Latency, Throughput FPS).
-10. **Cell 10**: Xuất file tổng hợp đa tỉ lệ `{model}_multiscale_summary.csv` & `{model}_multiscale_summary.json`.
-11. **Cell 11**: Vẽ 4 biểu đồ phân tích đánh đổi suy giảm theo Scale (PSNR, LPIPS, FPS, PSNR Gain) bằng font chuẩn tiếng Anh học thuật không lỗi font.
-12. **Cell 12**: Đóng gói toàn bộ kết quả thành file ZIP `{model}_benchmark_results.zip`.
-13. **Cell 13**: Giải phóng toàn bộ bộ nhớ GPU VRAM.
+9. **Cell 9**: Thống kê so sánh hiệu năng của mô hình qua 3 Scale (PSNR, SSIM, MS-SSIM, LPIPS, NIQE, Latency, Throughput FPS).
+10. **Cell 10**: Xuất file tổng hợp đa tỉ lệ `{model}_multiscale_summary.csv` & `{model}_multiscale_summary.json` và file per-image JSON/CSV.
+11. **Cell 11**: Đóng gói toàn bộ kết quả thành file ZIP `{model}_benchmark_results.zip`.
+12. **Cell 12**: Giải phóng toàn bộ bộ nhớ GPU VRAM.
 
 ---
 
