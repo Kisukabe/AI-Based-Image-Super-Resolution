@@ -1,0 +1,52 @@
+================================================================================
+NHIEM VU 2: BIT-ACCURATE DV, BENCHMARK PARSER & STATISTICAL ANALYSIS
+Kien truc: Compact SRCNN (1 -> 16 -> 8 -> 1) tren Xilinx Zynq-7020
+Nguoi thuc hien: Thanh vien 2 (Data Science / Design Verification)
+================================================================================
+
+1. PHAN TICH THONG KE DATASET 2.100 ANH TU FILE JSON CUA PYNQ-Z2
+--------------------------------------------------------------------------------
+- Nhan file `benchmark_2200_resume.json` tu ban chay bo phan cung.
+- Viet script Python `analyze_kaggle_benchmark.py` de tinh toan:
+    * Mean FPGA PSNR +/- Std (Do lech chuan).
+    * Mean FPGA SSIM +/- Std (Do lech chuan).
+    * Mean Bicubic PSNR +/- Std va Mean Bicubic SSIM +/- Std.
+    * Mean PSNR Gain +/- Std (Gain = PSNR_FPGA - PSNR_Bicubic).
+    * Ty le phan tram so luong anh co PSNR Gain > 0.
+- Ve bieu do Histogram phan bo PSNR Gain va phan bo SSIM tren toan bo 2.100 anh (DPI 300).
+
+2. KIEM THU BIT-ACCURATE DV SCOREBOARD
+--------------------------------------------------------------------------------
+- Xay dung Golden Model bang Python mo phong dung 100% so hoc RTL:
+    * Dinh dang Pixel vao: S7.0 (8-bit signed [-128, 127], offset -128 tu goc [0, 255]).
+    * Dinh dang Trong so : S0.7 (8-bit signed [-1.0, +0.992]).
+    * Tich luy          : S24.7 (32-bit signed).
+    * Dich bit & Kep bien: Dinh acc >> 7 sau moi tang Conv. Layer 1/2 qua ReLU kep [0, 127]. Layer 3 cong 128 va kep [0, 255].
+- Chay Scoreboard kiem tra cheo tung pixel giua output FPGA va Golden Model:
+    * Xac nhan sai so tuyet doi |I_FPGA - I_Golden| == 0 tren 100% diem anh.
+
+3. DO DAC THUC NGHIEM DA NEN TANG (CPU vs GPU vs FPGA)
+--------------------------------------------------------------------------------
+- Viet script do thoi gian chay End-to-End tren may tinh (gom Bicubic 2x + Conv + Luu ket qua):
+    * CPU: Intel/AMD (PyTorch Float32, MKL-DNN, do package power bang Intel Power Gadget).
+    * GPU: NVIDIA (PyTorch CUDA Float32, do cong suat bang nvidia-smi).
+    * Chay 10 lan warm-up, lay gia tri trung binh va do lech chuan qua 100 lan lap.
+- Ket hop so lieu thuc te tren bo PYNQ-Z2:
+    * Total SoC Latency: 444.190 ms (Khung 1024x1024), cong suat 1.438 W.
+    * Throughput toan chip: 2.25 FPS, hieu qua nang luong: 1.56 FPS/W.
+- Lap bang so sanh da bien: Platform | Data Type | Latency E2E (ms) | Power (W) | FPS/W.
+
+4. XUAT HINH ANH MINH HOA TRUC QUAN (ROI ZOOM-IN & HEATMAP)
+--------------------------------------------------------------------------------
+- Lay 5 bo anh mau tu thu muc `visual_samples/` cua ban chay bo.
+- Cat vung quan tam (ROI 128x128) phong to 4x de so sanh:
+    [Ground Truth] vs [Low-Res] vs [Bicubic] vs [FPGA Output]
+- Ve ban do nhiet sai so tuyet doi (Residual Error Heatmap: |I_SR - I_HR|) cho ca Bicubic va FPGA de chung minh kha nang giam nhieu va tai tao bien canh.
+
+5. SAN PHAM BAN GIAO (DELIVERABLES)
+--------------------------------------------------------------------------------
+1. Script phan tich JSON va ve Histogram (`analyze_kaggle_benchmark.py`).
+2. Script kiem thu Bit-Exact DV (`dv_scoreboard_check.py`).
+3. File Excel chua bang thong ke 2.100 anh (Mean, Std) va bang do CPU/GPU/FPGA.
+4. Thu muc hinh anh DPI 300 (Histogram, 5 cap anh ROI Zoom-in, Error Heatmaps).
+================================================================================

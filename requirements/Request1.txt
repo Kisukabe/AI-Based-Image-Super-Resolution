@@ -1,0 +1,49 @@
+================================================================================
+NHIEM VU 1: AI MODELING, DATA DEGRADATION & SOFTWARE BASELINE
+Kien truc: Compact SRCNN (1 -> 16 -> 8 -> 1)
+Nguoi thuc hien: Thanh vien 1 (AI / Data Science)
+================================================================================
+
+CHU Y:
+Khong sua doi hay ghi de 2 file hex trong Vivado. Bitstream phan cung da nap co 
+dinh tren bo PYNQ-Z2 de phuc vu do dac thuc nghiem.
+
+1. HUAN LUYEN VA DO SO LIEU FLOAT32 BASELINE
+--------------------------------------------------------------------------------
+- Xay dung 2 mang PyTorch Float32 tren tap anh X-quang (NIH Chest X-ray):
+    a) SRCNN goc (1 -> 64 -> 32 -> 1): 8.129 tham so (Lam baseline so sanh).
+    b) Compact SRCNN (1 -> 16 -> 8 -> 1): 1.649 tham so (Khop voi RTL).
+       * Layer 1: Conv2d(1, 16, kernel_size=9, padding=4) + ReLU (1.296 w, 16 b)
+       * Layer 2: Conv2d(16, 8, kernel_size=1, padding=0) + ReLU (128 w, 8 b)
+       * Layer 3: Conv2d(8, 1, kernel_size=5, padding=2) (200 w, 1 b)
+- Huan luyen voi ham Loss: Loss = MSE + 0.1 * Sobel_Edge_Loss.
+- Do dac chi so chat luong Float32 tren tap test:
+    * PSNR trung binh va SSIM trung binh cua SRCNN goc.
+    * PSNR trung binh va SSIM trung binh cua Compact SRCNN.
+    * PSNR trung binh khi chi phong to bang Bicubic (Bicubic Baseline).
+
+2. XAY DUNG PIPELINE MO PHONG SUY THOAI VAT LY (DATA DEGRADATION)
+--------------------------------------------------------------------------------
+- Mo hinh toan hoc suy thoai:
+    I_lr = (I_hr (*) k) \downarrow_s + n
+  Trong do:
+    * I_hr: Anh goc High-Resolution Ground Truth.
+    * k   : Ham lam mo quang hoc Gaussian blur (sigma tu 0.5 den 1.5).
+    * \downarrow_s: Ha mau khong gian 2x.
+    * n   : Nhieu cam bien y te Poisson-Gaussian.
+- Xuat tap du lieu cap anh (LR va HR) de ban DV va ban Nhúng lay lam tap test chung.
+
+3. TRICH XUAT SO LIEU VA HINH ANH CHO BAI BAO
+--------------------------------------------------------------------------------
+- Luu tham so train: Optimizer (Adam), Learning Rate, Batch Size, Epochs.
+- Xuat do thi hoi tu ham Loss (Train Loss vs Val Loss) chuan DPI 300.
+- Tong hop bang so lieu so sanh 3 muc: Bicubic vs SRCNN goc Float32 vs Compact SRCNN Float32.
+
+4. SAN PHAM BAN GIAO (DELIVERABLES)
+--------------------------------------------------------------------------------
+1. File checkpoint PyTorch (`compact_srcnn_float32.pth`).
+2. Script tao anh suy thoai (`generate_degraded_dataset.py`).
+3. Script danh gia mo hinh tren tap test (`evaluate_pytorch_baseline.py`).
+4. File anh do thi hoi tu ham Loss (DPI 300).
+5. File text/excel chua bang so lieu PSNR/SSIM doi chung tren tap test.
+================================================================================
