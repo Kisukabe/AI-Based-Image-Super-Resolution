@@ -1,0 +1,584 @@
+{
+  "metadata": {
+    "title": "Bảng Đặc Tả Toàn Diện Các Chỉ Số Đánh Giá & Nguồn Tính Toán Đầu Vào",
+    "english_title": "Comprehensive System Evaluation Metrics & Input Computation Specification",
+    "reference_documents": [
+      "evaluation_metrics.pdf",
+      "requirements/Request1.txt",
+      "requirements/Request2.txt",
+      "requirements/TASK_ROADMAP.md"
+    ],
+    "target_platform": "Xilinx Zynq-7020 SoC (PYNQ-Z2)",
+    "core_model": "Compact SRCNN (1 -> 16 -> 8 -> 1, 1.649 parameters, Fixed-point Q7/S7.0)",
+    "baseline_model": "Original SRCNN (1 -> 64 -> 32 -> 1, 8.129 parameters, Float32)",
+    "dataset_resolution": "LR: 512x512, HR: 1024x1024, Scale 2x, Grayscale (1 Channel)",
+    "version": "1.0.0",
+    "created_date": "2026-09-10"
+  },
+  "raw_data_sources": {
+    "legacy_software_raw_2x": "legacy_experiments/benchmark_results/software/SRCNN/srcnn_2x_benchmark.json",
+    "legacy_software_raw_3x": "legacy_experiments/benchmark_results/software/SRCNN/srcnn_3x_benchmark.json",
+    "legacy_software_raw_4x": "legacy_experiments/benchmark_results/software/SRCNN/srcnn_4x_benchmark.json",
+    "legacy_hardware_raw": "legacy_experiments/benchmark_results/hardware/benchmark_checkpoint.json",
+    "hardware_weights_hex": "core_project/hardware_fpga/weights_fixed_point/weights_hex_clean.txt",
+    "hardware_biases_hex": "core_project/hardware_fpga/weights_fixed_point/biases_hex_clean.txt",
+    "testset_ground_truth_hr": "core_project/data/degraded_testset/HR/",
+    "testset_degraded_lr": "core_project/data/degraded_testset/LR_2x/",
+    "testset_metadata": "core_project/data/degraded_testset/metadata.json"
+  },
+  "metrics_specification": [
+    {
+      "metric_id": "M_MSE",
+      "name_vi": "Sai số bình phương trung bình (MSE)",
+      "name_en": "Mean Squared Error",
+      "category": "1.1.A. Full-Reference Image Quality",
+      "unit": "pixel_intensity²",
+      "target_threshold": "Càng nhỏ càng tốt, tiệm cận 0",
+      "status": "READY_EXTRACTED",
+      "task_step": "Step 6 (T1.6) & Step 9 (T2.3)",
+      "input_sources": [
+        "core_project/data/degraded_testset/HR/",
+        "output/SR_images/"
+      ],
+      "input_variables": ["I_sr (uint8 hoặc float [0, 255])", "I_hr (uint8 hoặc float [0, 255])"],
+      "formula_text": "MSE = (1 / N) * sum((I_sr - I_hr)²)",
+      "python_code": "mse = float(np.mean((img_sr.astype(np.float64) - img_hr.astype(np.float64)) ** 2))",
+      "extracted_values": {
+        "SRCNN_2x": 8.81189,
+        "SRCNN_3x": 9.689265,
+        "SRCNN_4x": 22.582671,
+        "Bicubic_2x": 8.008704,
+        "Bicubic_3x": 10.36112,
+        "Bicubic_4x": 19.340723
+      }
+    },
+    {
+      "metric_id": "M_RMSE",
+      "name_vi": "Căn bậc hai sai số điểm ảnh (RMSE)",
+      "name_en": "Root Mean Squared Error",
+      "category": "1.1.A. Full-Reference Image Quality",
+      "unit": "pixel_intensity [0, 255]",
+      "target_threshold": "Càng nhỏ càng tốt, lý tưởng < 3.0",
+      "status": "READY_EXTRACTED",
+      "task_step": "Step 6 (T1.6) & Step 9 (T2.3)",
+      "input_sources": ["Computed from M_MSE"],
+      "input_variables": ["MSE"],
+      "formula_text": "RMSE = sqrt(MSE)",
+      "python_code": "rmse = float(np.sqrt(mse))",
+      "extracted_values": {
+        "SRCNN_2x": 2.822767,
+        "SRCNN_3x": 2.9746,
+        "SRCNN_4x": 4.465532,
+        "Bicubic_2x": 2.693254,
+        "Bicubic_3x": 3.07153,
+        "Bicubic_4x": 4.140187
+      }
+    },
+    {
+      "metric_id": "M_CNR",
+      "name_vi": "Tỷ số tương phản trên nhiễu (CNR)",
+      "name_en": "Contrast-to-Noise Ratio",
+      "category": "1.1.A. Full-Reference Image Quality",
+      "unit": "ratio (không thứ nguyên)",
+      "target_threshold": "Càng cao càng tốt, duy trì tương phản tự nhiên",
+      "status": "COMPUTABLE_VIA_SCRIPT",
+      "task_step": "Step 6 (T1.6) & Step 11 (T2.5)",
+      "input_sources": ["output/SR_images/"],
+      "input_variables": ["I_sr (uint8 [0, 255])", "M_roi (Mask mô quan tâm)", "M_bg (Mask nền xung quanh)"],
+      "formula_text": "CNR = abs(mean(ROI) - mean(BG)) / sqrt(std(ROI)² + std(BG)²)",
+      "python_code": "def compute_cnr(img, mask_roi, mask_bg):\n    roi_vals = img[mask_roi > 0].astype(np.float64)\n    bg_vals = img[mask_bg > 0].astype(np.float64)\n    return float(abs(np.mean(roi_vals) - np.mean(bg_vals)) / np.sqrt(np.var(roi_vals) + np.var(bg_vals) + 1e-8))",
+      "extracted_values": {
+        "Swift_SRGAN_Historical_Mean": 0.0032,
+        "Swift_SRGAN_Historical_Std": 0.0013
+      }
+    },
+    {
+      "metric_id": "M_IFC",
+      "name_vi": "Độ trung thực thông tin (IFC)",
+      "name_en": "Information Fidelity Criterion",
+      "category": "1.1.A. Full-Reference Image Quality",
+      "unit": "bits / information score",
+      "target_threshold": "Càng cao càng tốt (> 2.0)",
+      "status": "COMPUTABLE_VIA_SCRIPT",
+      "task_step": "Step 6 (T1.6)",
+      "input_sources": ["core_project/data/degraded_testset/HR/", "output/SR_images/"],
+      "input_variables": ["I_sr", "I_hr"],
+      "formula_text": "IFC = sum(Mutual_Information(subband_sr, subband_hr)) qua Gaussian Scale Mixture",
+      "python_code": "import sewar\nifc_val = float(sewar.full_ref.ifc(img_hr, img_sr))",
+      "extracted_values": {
+        "Note": "Tính toán qua thư viện sewar.full_ref.ifc"
+      }
+    },
+    {
+      "metric_id": "M_IMG_MEAN",
+      "name_vi": "Độ sáng trung bình ảnh đầu ra (Mean)",
+      "name_en": "Mean Pixel Intensity",
+      "category": "1.1.B. No-Reference Image Quality",
+      "unit": "pixel_intensity [0, 255]",
+      "target_threshold": "Dải chuẩn hiển thị [120, 140] cho ảnh X-quang",
+      "status": "READY_EXTRACTED",
+      "task_step": "Step 6 (T1.6) & Step 9 (T2.3)",
+      "input_sources": ["output/SR_images/"],
+      "input_variables": ["I_sr"],
+      "formula_text": "Mean = (1 / N) * sum(I_sr)",
+      "python_code": "mean_val = float(np.mean(img_sr.astype(np.float64)))",
+      "extracted_values": {
+        "SRCNN_2x": 130.8268,
+        "SRCNN_3x": 130.8712,
+        "SRCNN_4x": 130.8745
+      }
+    },
+    {
+      "metric_id": "M_IMG_STD",
+      "name_vi": "Độ lệch chuẩn mức xám pixel (STD)",
+      "name_en": "Pixel Standard Deviation (Contrast)",
+      "category": "1.1.B. No-Reference Image Quality",
+      "unit": "pixel_intensity [0, 255]",
+      "target_threshold": "Càng cao càng tốt (ở mức hợp lý [50, 70]), phản ánh dải tương phản phong phú",
+      "status": "READY_EXTRACTED",
+      "task_step": "Step 6 (T1.6) & Step 9 (T2.3)",
+      "input_sources": ["output/SR_images/"],
+      "input_variables": ["I_sr"],
+      "formula_text": "STD = sqrt((1 / N) * sum((I_sr - Mean)²))",
+      "python_code": "std_val = float(np.std(img_sr.astype(np.float64)))",
+      "extracted_values": {
+        "SRCNN_2x": 59.1285,
+        "SRCNN_3x": 59.0434,
+        "SRCNN_4x": 58.9677
+      }
+    },
+    {
+      "metric_id": "M_STD_METRICS",
+      "name_vi": "Độ lệch chuẩn thống kê của các Metric (Mean ± Std)",
+      "name_en": "Statistical Standard Deviation of Metrics",
+      "category": "Statistical Dispersion & Uncertainty",
+      "unit": "Đơn vị tương ứng của từng metric",
+      "target_threshold": "Bắt buộc báo cáo Mean ± Std theo chuẩn bài báo khoa học",
+      "status": "READY_EXTRACTED",
+      "task_step": "Step 6 (T1.6), Step 9 (T2.3), Step 10 (T2.4)",
+      "input_sources": ["legacy_experiments/benchmark_results/software/SRCNN/srcnn_2x_benchmark.json"],
+      "input_variables": ["Mảng điểm số của từng ảnh trong tập 2.200 mẫu"],
+      "formula_text": "Std_metric = sqrt((1 / (N - 1)) * sum((metric_i - Mean_metric)²))",
+      "python_code": "std_psnr = float(np.std(psnr_array, ddof=1))",
+      "extracted_values": {
+        "Std_PSNR_Model_2x": 2.9588,
+        "Std_PSNR_Bicubic_2x": 2.9679,
+        "Std_LPIPS_Model_2x": 0.0647,
+        "Std_LPIPS_Bicubic_2x": 0.0490,
+        "Std_PSNR_Model_3x": 2.6089,
+        "Std_PSNR_Bicubic_3x": 2.6469,
+        "Std_LPIPS_Model_3x": 0.0867,
+        "Std_PSNR_Model_4x": 3.0269,
+        "Std_PSNR_Bicubic_4x": 2.9936,
+        "Std_LPIPS_Model_4x": 0.0999
+      }
+    },
+    {
+      "metric_id": "M_BICUBIC_BASELINE",
+      "name_vi": "Các chỉ số cơ sở của phép nội suy Bicubic",
+      "name_en": "Bicubic Baseline Absolute Reference Metrics",
+      "category": "Baseline Reference Benchmark",
+      "unit": "dB (PSNR), [0, 1] (SSIM, MS-SSIM, LPIPS)",
+      "target_threshold": "Mốc đối chứng cơ sở để đo Gain",
+      "status": "READY_EXTRACTED",
+      "task_step": "Step 6 (T1.6) & Step 9 (T2.3)",
+      "input_sources": ["legacy_experiments/benchmark_results/software/SRCNN/srcnn_2x_benchmark.json"],
+      "input_variables": ["I_bicubic", "I_hr"],
+      "formula_text": "PSNR_Bicubic, SSIM_Bicubic, LPIPS_Bicubic",
+      "python_code": "psnr_bic = peak_signal_noise_ratio(img_hr, img_bic, data_range=255)",
+      "extracted_values": {
+        "Scale_2x": {
+          "PSNR_Bicubic_dB": 40.0072,
+          "SSIM_Bicubic": 0.9684,
+          "MS_SSIM_Bicubic": 0.9969,
+          "LPIPS_Bicubic": 0.1135,
+          "NIQE_Bicubic": 6.6486
+        },
+        "Scale_3x": {
+          "PSNR_Bicubic_dB": 38.7900,
+          "SSIM_Bicubic": 0.9523,
+          "MS_SSIM_Bicubic": 0.9920,
+          "LPIPS_Bicubic": 0.2376,
+          "NIQE_Bicubic": 8.0648
+        },
+        "Scale_4x": {
+          "PSNR_Bicubic_dB": 36.3129,
+          "SSIM_Bicubic": 0.9388,
+          "MS_SSIM_Bicubic": 0.9878,
+          "LPIPS_Bicubic": 0.3183,
+          "NIQE_Bicubic": 8.6856
+        }
+      }
+    },
+    {
+      "metric_id": "M_SSIM_GAIN",
+      "name_vi": "Độ cải thiện cấu trúc giải phẫu (SSIM Gain / MS-SSIM Gain)",
+      "name_en": "SSIM Gain and MS-SSIM Gain",
+      "category": "Baseline Reference Benchmark",
+      "unit": "chênh lệch giá trị [0, 1]",
+      "target_threshold": "Càng lớn hơn 0 càng tốt",
+      "status": "READY_EXTRACTED",
+      "task_step": "Step 6 (T1.6) & Step 9 (T2.3)",
+      "input_sources": ["legacy_experiments/benchmark_results/software/SRCNN/srcnn_2x_benchmark.json"],
+      "input_variables": ["SSIM_Model", "SSIM_Bicubic"],
+      "formula_text": "SSIM_Gain = SSIM_Model - SSIM_Bicubic; MS_SSIM_Gain = MS_SSIM_Model - MS_SSIM_Bicubic",
+      "python_code": "ssim_gain = float(avg_ssim_model - avg_ssim_bicubic)",
+      "extracted_values": {
+        "SSIM_Gain_2x": -0.0030,
+        "MS_SSIM_Gain_2x": -0.0012,
+        "SSIM_Gain_3x": 0.0012,
+        "MS_SSIM_Gain_3x": 0.0004,
+        "SSIM_Gain_4x": -0.0011,
+        "MS_SSIM_Gain_4x": -0.0010
+      }
+    },
+    {
+      "metric_id": "M_POSITIVE_GAIN_PCT",
+      "name_vi": "Tỷ lệ phần trăm số ảnh có PSNR Gain > 0",
+      "name_en": "Percentage of Images with Positive PSNR Gain",
+      "category": "Statistical Distribution (Request 2.1)",
+      "unit": "Phần trăm (%)",
+      "target_threshold": "Càng cao càng tốt (mục tiêu > 50% số ảnh có lợi ích cải thiện)",
+      "status": "COMPUTABLE_VIA_SCRIPT",
+      "task_step": "Step 9 (T2.3)",
+      "input_sources": ["per_image_results trong srcnn_2x_benchmark.json hoặc benchmark_checkpoint.json"],
+      "input_variables": ["Mảng gain: psnr_model_i - psnr_bicubic_i"],
+      "formula_text": "% Gain > 0 = 100.0 * (Count(gain > 0) / N_total)",
+      "python_code": "pct_pos = float(100.0 * np.sum(np.array(gains) > 0.0) / len(gains))",
+      "extracted_values": {
+        "Target_Dataset_Size": 2200,
+        "Output_Artifact": "Biểu đồ Histogram và tỷ lệ % tại Bước 9"
+      }
+    },
+    {
+      "metric_id": "M_PERCENTILES_DISPERSION",
+      "name_vi": "Phân vị và khoảng tứ phân vị (Min, Max, Median, IQR)",
+      "name_en": "Percentiles and Interquartile Range",
+      "category": "Statistical Distribution",
+      "unit": "dB (PSNR), [0, 1] (SSIM)",
+      "target_threshold": "Đánh giá độ phân tán và kiểm soát ngoại lai (outliers)",
+      "status": "COMPUTABLE_VIA_SCRIPT",
+      "task_step": "Step 9 (T2.3) & Step 12 (T2.6)",
+      "input_sources": ["per_image_results trong srcnn_2x_benchmark.json"],
+      "input_variables": ["Mảng psnr và ssim của 2.200 ảnh"],
+      "formula_text": "Q1 = percentile(25), Median = percentile(50), Q3 = percentile(75), IQR = Q3 - Q1",
+      "python_code": "q25, med, q75 = np.percentile(data, [25, 50, 75])\niqr = float(q75 - q25)",
+      "extracted_values": {
+        "Output_Artifact": "Bảng thống kê mô tả chi tiết tại Bước 9"
+      }
+    },
+    {
+      "metric_id": "M_CLINICAL_TIERS",
+      "name_vi": "Phân tầng chất lượng lâm sàng 4 bậc",
+      "name_en": "Clinical Grade Distribution (4 Tiers)",
+      "category": "Clinical Image Quality Assessment",
+      "unit": "Số lượng ảnh & Tỷ lệ phần trăm (%)",
+      "target_threshold": "100% ảnh đạt ≥ 30 dB (không có ảnh hỏng)",
+      "status": "COMPUTABLE_VIA_SCRIPT",
+      "task_step": "Step 9 (T2.3) & Step 12 (T2.6)",
+      "input_sources": ["per_image_results"],
+      "input_variables": ["psnr_i", "ssim_i"],
+      "formula_text": "Xuất sắc: PSNR ≥ 40 dB & SSIM ≥ 0.95; Tốt: 35 ≤ PSNR < 40; Đạt chuẩn: 30 ≤ PSNR < 35; Không đạt: PSNR < 30",
+      "python_code": "def classify_clinical(psnr, ssim):\n    if psnr >= 40.0 and ssim >= 0.95: return 'EXCELLENT'\n    elif psnr >= 35.0: return 'GOOD'\n    elif psnr >= 30.0: return 'ACCEPTABLE'\n    else: return 'UNACCEPTABLE'",
+      "extracted_values": {
+        "Swift_SRGAN_Historical_Sample": {
+          "Excellent_pct": 77.8,
+          "Good_pct": 21.3,
+          "Acceptable_pct": 0.9,
+          "Unacceptable_pct": 0.0
+        }
+      }
+    },
+    {
+      "metric_id": "M_LOSS_COMPONENTS",
+      "name_vi": "Thành phần hàm mất mát hỗn hợp (Composite Loss)",
+      "name_en": "Training Loss Components (MSE + 0.1 * Sobel)",
+      "category": "Training & Model Convergence",
+      "unit": "loss value (không thứ nguyên)",
+      "target_threshold": "Hội tụ mượt, đồ thị Train/Val loss giảm đều không overfitting",
+      "status": "COMPUTABLE_VIA_SCRIPT",
+      "task_step": "Step 5 (T1.5)",
+      "input_sources": ["PyTorch training loop qua custom_loss.py"],
+      "input_variables": ["loss_total", "mse_component", "sobel_component"],
+      "formula_text": "Loss = MSE + 0.1 * Sobel_Edge_Loss",
+      "python_code": "from core_project.ai_software.losses.custom_loss import SRCNN_CompositeLoss\ncriterion = SRCNN_CompositeLoss(sobel_weight=0.1)\nloss, mse_val, sobel_val = criterion(pred, target)",
+      "extracted_values": {
+        "Weight_Ratio": "1.0 MSE : 0.1 Sobel",
+        "Target_Artifact": "loss_convergence_dpi300.png"
+      }
+    },
+    {
+      "metric_id": "M_MODEL_PARAMS_FLOPS",
+      "name_vi": "Độ phức tạp tham số và phép tính (Params, FLOPs/MACs)",
+      "name_en": "Model Complexity (Parameters & FLOPs)",
+      "category": "Model Complexity & Architecture",
+      "unit": "Số tham số (params), GFLOPs/GMACs",
+      "target_threshold": "Compact SRCNN đúng 1.649 params; Original SRCNN đúng 8.129 params",
+      "status": "COMPUTABLE_VIA_SCRIPT",
+      "task_step": "Step 4 (T1.4), Step 6 (T1.6), Step 10 (T2.4)",
+      "input_sources": ["core_project/ai_software/models/models_srcnn.py"],
+      "input_variables": ["Compact_SRCNN", "SRCNN_Original"],
+      "formula_text": "Params = sum(w.size + b.size); FLOPs tính trên input (1, 1, 1024, 1024)",
+      "python_code": "from thop import profile\nmacs, params = profile(model, inputs=(torch.randn(1, 1, 1024, 1024),))",
+      "extracted_values": {
+        "Compact_SRCNN_Params": 1649,
+        "Compact_SRCNN_Weights": 1624,
+        "Compact_SRCNN_Biases": 25,
+        "Original_SRCNN_Params": 8129,
+        "Legacy_SRCNN_RGB_Params": 69251,
+        "Compact_SRCNN_GOPs_Per_Frame": 3.4058
+      }
+    },
+    {
+      "metric_id": "M_BIT_EXACT_RATE",
+      "name_vi": "Tỷ lệ khớp số nguyên bit-exact giữa phần mềm và phần cứng",
+      "name_en": "Exact Bit Match Rate",
+      "category": "1.3. Arithmetic & Quantization Integrity (Request 2.2)",
+      "unit": "Phần trăm (%)",
+      "target_threshold": "Bắt buộc 100.000% (|I_FPGA - I_Golden| == 0 trên 100% pixel)",
+      "status": "COMPUTABLE_VIA_SCRIPT",
+      "task_step": "Step 8 (T2.2)",
+      "input_sources": [
+        "core_project/hardware_fpga/dv_verification/golden_model.py",
+        "Đầu ra mô phỏng Verilog RTL / bo mạch FPGA"
+      ],
+      "input_variables": ["I_fpga (uint8)", "I_golden (uint8)"],
+      "formula_text": "Match_Rate = 100.0 * (Count(abs(I_fpga - I_golden) == 0) / N_pixels)",
+      "python_code": "diff = np.abs(fpga_arr.astype(int) - golden_arr.astype(int))\nmatch_rate = float(100.0 * np.sum(diff == 0) / diff.size)",
+      "extracted_values": {
+        "Target_Rule_04_CTO": "|I_FPGA - I_Golden| == 0 on 100% pixels",
+        "Unit_Test_Verification_Status": "PASSED on tb_axis_functional.v and smoke test"
+      }
+    },
+    {
+      "metric_id": "M_MAE_LSB",
+      "name_vi": "Sai số tuyệt đối trung bình theo đơn vị LSB",
+      "name_en": "Mean Absolute Error in LSB",
+      "category": "1.3. Arithmetic & Quantization Integrity",
+      "unit": "LSB (Least Significant Bit)",
+      "target_threshold": "Bắt buộc MAE = 0.0 LSB đối với Bit-Exact DV; < 1.0 LSB đối với Quantization Loss",
+      "status": "COMPUTABLE_VIA_SCRIPT",
+      "task_step": "Step 8 (T2.2)",
+      "input_sources": ["I_fpga", "I_golden"],
+      "input_variables": ["diff = abs(I_fpga - I_golden)"],
+      "formula_text": "MAE = (1 / N) * sum(abs(I_fpga - I_golden))",
+      "python_code": "mae_lsb = float(np.mean(np.abs(fpga_arr.astype(int) - golden_arr.astype(int))))",
+      "extracted_values": {
+        "Bit_Exact_Target": 0.0
+      }
+    },
+    {
+      "metric_id": "M_MAX_DELTA_LSB",
+      "name_vi": "Độ sai lệch điểm ảnh lớn nhất (Max Delta)",
+      "name_en": "Maximum Absolute Pixel Deviation",
+      "category": "1.3. Arithmetic & Quantization Integrity",
+      "unit": "LSB (Least Significant Bit)",
+      "target_threshold": "Bắt buộc Max Delta = 0 LSB đối với Bit-Exact DV",
+      "status": "COMPUTABLE_VIA_SCRIPT",
+      "task_step": "Step 8 (T2.2)",
+      "input_sources": ["I_fpga", "I_golden"],
+      "input_variables": ["diff = abs(I_fpga - I_golden)"],
+      "formula_text": "Max_Delta = max(abs(I_fpga - I_golden))",
+      "python_code": "max_delta = int(np.max(np.abs(fpga_arr.astype(int) - golden_arr.astype(int))))",
+      "extracted_values": {
+        "Bit_Exact_Target": 0
+      }
+    },
+    {
+      "metric_id": "M_OVERFLOW_CHECK",
+      "name_vi": "Kiểm tra lỗi tràn số vật lý (Overflow / Underflow)",
+      "name_en": "Accumulator Overflow and Saturation Check",
+      "category": "1.3. Arithmetic & Quantization Integrity",
+      "unit": "Trạng thái (PASSED / FAILED, 0 lỗi tràn)",
+      "target_threshold": "Bắt buộc PASSED (0 lỗi tràn nhờ logic kẹp biên S24.7 >> 7, ReLU [0, 127], Output [0, 255])",
+      "status": "COMPUTABLE_VIA_SCRIPT",
+      "task_step": "Step 7 (T2.1) & Step 8 (T2.2)",
+      "input_sources": ["RTL accumulator logic & Golden Model int32 clip"],
+      "input_variables": ["accumulators_L1", "accumulators_L2", "accumulators_L3"],
+      "formula_text": "Overflow = (acc > 2^31 - 1) or (acc < -2^31)",
+      "python_code": "assert np.all(acc >= -2147483648) and np.all(acc <= 2147483647)",
+      "extracted_values": {
+        "Status": "PASSED (Đã kiểm chứng trong test_golden_model.py)"
+      }
+    },
+    {
+      "metric_id": "M_HARDWARE_GOPS",
+      "name_vi": "Băng thông tính toán phần cứng thô (GOPS)",
+      "name_en": "Giga-Operations Per Second (GOPS)",
+      "category": "2.4. Throughput & Hardware Efficiency",
+      "unit": "GOPS (Tỷ phép toán / giây)",
+      "target_threshold": "Càng cao càng tốt, chứng minh năng lực tính toán song song",
+      "status": "COMPUTABLE_VIA_SCRIPT",
+      "task_step": "Step 10 (T2.4) & Step 12 (T2.6)",
+      "input_sources": ["Total MACs per frame và FPS thực nghiệm"],
+      "input_variables": ["GOPs_per_frame = 3.4058", "FPS = 2.25"],
+      "formula_text": "GOPS = GOPs_per_frame * FPS",
+      "python_code": "gops = 3.405774848 * fps",
+      "extracted_values": {
+        "PYNQ_Z2_FPS": 2.25,
+        "PYNQ_Z2_GOPS": 7.663
+      }
+    },
+    {
+      "metric_id": "M_HARDWARE_GOPS_PER_WATT",
+      "name_vi": "Hiệu năng tính toán trên công suất tiêu thụ (GOPS/W)",
+      "name_en": "Computational Efficiency per Watt",
+      "category": "2.4. Throughput & Hardware Efficiency",
+      "unit": "GOPS / Watt",
+      "target_threshold": "Càng cao càng tốt, thước đo cạnh tranh cốt lõi của FPGA với CPU/GPU",
+      "status": "COMPUTABLE_VIA_SCRIPT",
+      "task_step": "Step 10 (T2.4) & Step 12 (T2.6)",
+      "input_sources": ["GOPS và Công suất P (Watts)"],
+      "input_variables": ["GOPS = 7.663", "Power = 1.438 W"],
+      "formula_text": "GOPS_W = GOPS / Power_Watts",
+      "python_code": "gops_per_w = float(gops / power_watts)",
+      "extracted_values": {
+        "PYNQ_Z2_Power_Watts": 1.438,
+        "PYNQ_Z2_GOPS_Per_Watt": 5.329
+      }
+    },
+    {
+      "metric_id": "M_DMA_BANDWIDTH",
+      "name_vi": "Băng thông truyền dữ liệu DDR/DRAM qua AXI DMA",
+      "name_en": "DDR / DRAM Memory Bandwidth",
+      "category": "2.4. Throughput & Hardware Efficiency",
+      "unit": "MB/s (MegaBytes per second)",
+      "target_threshold": "Nằm trong giới hạn bus AXI, không bị nghẽn cổ chai bộ nhớ",
+      "status": "COMPUTABLE_VIA_SCRIPT",
+      "task_step": "Step 10 (T2.4)",
+      "input_sources": ["Kích thước ảnh vào/ra và FPS"],
+      "input_variables": ["Bytes_in = 1024*1024", "Bytes_out = 1024*1024", "FPS = 2.25"],
+      "formula_text": "Bandwidth_MBs = ((Bytes_in + Bytes_out) / 10^6) * FPS",
+      "python_code": "bandwidth_mbs = ((1024 * 1024 * 2) / (1024 * 1024)) * 2.25",
+      "extracted_values": {
+        "PYNQ_Z2_Bandwidth_MBs": 4.50
+      }
+    },
+    {
+      "metric_id": "M_ENERGY_EFFICIENCY_FPS_W",
+      "name_vi": "Hiệu suất năng lượng khung hình trên Watt (FPS/W)",
+      "name_en": "Energy Efficiency (FPS / Watt)",
+      "category": "2.4. Throughput & Hardware Efficiency (Request 2.3)",
+      "unit": "FPS / Watt",
+      "target_threshold": "Càng cao càng tốt (> 1.0 FPS/W cho Edge FPGA)",
+      "status": "READY_EXTRACTED",
+      "task_step": "Step 10 (T2.4)",
+      "input_sources": ["legacy_experiments/benchmark_results/hardware/ hoặc Request 2.3"],
+      "input_variables": ["FPS = 2.25", "Power = 1.438 W"],
+      "formula_text": "Energy_Efficiency = FPS / Power_Watts",
+      "python_code": "energy_eff = float(fps / power_watts)",
+      "extracted_values": {
+        "PYNQ_Z2_FPS_Per_Watt": 1.5646
+      }
+    }
+  ],
+  "pre_extracted_baseline_table": {
+    "description": "Bảng tổng hợp số liệu trích xuất sẵn từ 2.200 ảnh trong file chi tiết srcnn_2x_benchmark.json, srcnn_3x_benchmark.json, srcnn_4x_benchmark.json",
+    "scales": {
+      "2x": {
+        "images_evaluated": 2200,
+        "psnr_model_mean": 39.5989,
+        "psnr_model_std": 2.9588,
+        "psnr_bicubic_mean": 40.0072,
+        "psnr_bicubic_std": 2.9679,
+        "psnr_gain_mean": -0.4083,
+        "ssim_model_mean": 0.9654,
+        "ssim_bicubic_mean": 0.9684,
+        "ssim_gain_mean": -0.0030,
+        "msssim_model_mean": 0.9958,
+        "msssim_bicubic_mean": 0.9969,
+        "msssim_gain_mean": -0.0012,
+        "lpips_model_mean": 0.1883,
+        "lpips_model_std": 0.0647,
+        "lpips_bicubic_mean": 0.1135,
+        "lpips_bicubic_std": 0.0490,
+        "lpips_gain_mean": -0.0748,
+        "niqe_model_mean": 6.9807,
+        "niqe_bicubic_mean": 6.6486,
+        "epi_model_mean": 0.4259,
+        "mse_model_mean": 8.81189,
+        "rmse_model_mean": 2.822767,
+        "mse_bicubic_mean": 8.008704,
+        "rmse_bicubic_mean": 2.693254,
+        "pixel_intensity_mean": 130.8268,
+        "pixel_intensity_std": 59.1285,
+        "latency_raw_mean_ms": 60.91,
+        "throughput_raw_fps": 16.42
+      },
+      "3x": {
+        "images_evaluated": 2200,
+        "psnr_model_mean": 39.0562,
+        "psnr_model_std": 2.6089,
+        "psnr_bicubic_mean": 38.7900,
+        "psnr_bicubic_std": 2.6469,
+        "psnr_gain_mean": 0.2662,
+        "ssim_model_mean": 0.9535,
+        "ssim_bicubic_mean": 0.9523,
+        "ssim_gain_mean": 0.0012,
+        "msssim_model_mean": 0.9924,
+        "msssim_bicubic_mean": 0.9920,
+        "msssim_gain_mean": 0.0004,
+        "lpips_model_mean": 0.2796,
+        "lpips_model_std": 0.0867,
+        "lpips_bicubic_mean": 0.2376,
+        "lpips_bicubic_std": 0.0739,
+        "lpips_gain_mean": -0.0420,
+        "niqe_model_mean": 7.7994,
+        "niqe_bicubic_mean": 8.0648,
+        "epi_model_mean": 0.2600,
+        "mse_model_mean": 9.689265,
+        "rmse_model_mean": 2.9746,
+        "mse_bicubic_mean": 10.36112,
+        "rmse_bicubic_mean": 3.07153,
+        "pixel_intensity_mean": 130.8712,
+        "pixel_intensity_std": 59.0434,
+        "latency_raw_mean_ms": 61.65,
+        "throughput_raw_fps": 16.22
+      },
+      "4x": {
+        "images_evaluated": 2200,
+        "psnr_model_mean": 35.6680,
+        "psnr_model_std": 3.0269,
+        "psnr_bicubic_mean": 36.3129,
+        "psnr_bicubic_std": 2.9936,
+        "psnr_gain_mean": -0.6449,
+        "ssim_model_mean": 0.9377,
+        "ssim_bicubic_mean": 0.9388,
+        "ssim_gain_mean": -0.0011,
+        "msssim_model_mean": 0.9868,
+        "msssim_bicubic_mean": 0.9878,
+        "msssim_gain_mean": -0.0010,
+        "lpips_model_mean": 0.3800,
+        "lpips_model_std": 0.0999,
+        "lpips_bicubic_mean": 0.3183,
+        "lpips_bicubic_std": 0.0850,
+        "lpips_gain_mean": -0.0617,
+        "niqe_model_mean": 9.3792,
+        "niqe_bicubic_mean": 8.6856,
+        "epi_model_mean": 0.1879,
+        "mse_model_mean": 22.582671,
+        "rmse_model_mean": 4.465532,
+        "mse_bicubic_mean": 19.340723,
+        "rmse_bicubic_mean": 4.140187,
+        "pixel_intensity_mean": 130.8745,
+        "pixel_intensity_std": 58.9677,
+        "latency_raw_mean_ms": 30.85,
+        "throughput_raw_fps": 32.41
+      }
+    },
+    "pynq_z2_hardware_baseline": {
+      "model": "Compact SRCNN RTL Fixed-Point (1.649 params)",
+      "resolution": "1024x1024",
+      "scale": "2x",
+      "total_soc_latency_ms": 444.190,
+      "frame_rate_fps": 2.25,
+      "soc_power_watts": 1.438,
+      "energy_efficiency_fps_per_watt": 1.5646,
+      "gops_computational_throughput": 7.663,
+      "gops_per_watt": 5.329,
+      "axi_dma_bandwidth_mbs": 4.50,
+      "bit_exact_match_target": 100.0,
+      "max_absolute_error_target": 0
+    }
+  }
+}
