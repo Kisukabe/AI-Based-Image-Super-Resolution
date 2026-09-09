@@ -1,1 +1,0 @@
-../weights/weights_hex_clean.txt

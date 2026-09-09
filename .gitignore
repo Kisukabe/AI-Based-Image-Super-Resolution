@@ -42,14 +42,20 @@ conda-env/
 # PyTorch / Models / Large outputs
 *.pt
 *.pth
+!legacy_experiments/weight_models_rgb/**
+!core_project/ai_software/checkpoints/**
 !code software/models/weight_models/**
 *.onnx
 *.engine
-code software/sr_outputs.zip
+*.zip
+*.tar.gz
 sr_outputs/
-code software/sr_outputs/
+code software/sr_outputs*
 code software/logs/
 code software/eval_images/
+legacy_experiments/survey_assets/sr_outputs*
+legacy_experiments/survey_assets/logs/
+legacy_experiments/survey_assets/eval_images/
 
 # OS generated files (macOS & Windows)
 .DS_Store
