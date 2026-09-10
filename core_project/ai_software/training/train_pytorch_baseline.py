@@ -178,47 +178,103 @@ class MedicalXRaySRDataset(Dataset):
 
 
 # ------------------------------------------------------------------------------
-# DATASET SCANNER & SPLITTER
+# BALANCED SAMPLING DATASET STRATEGY (Mục 1.1 trong models/description.md)
 # ------------------------------------------------------------------------------
 def scan_and_split_dataset(
     dataset_dirs: List[Path],
     sealed_names: Set[str],
+    images_per_batch: int = 1000,
+    target_batches: int = 12,
     train_ratio: float = 0.85,
     max_images: Optional[int] = None,
     seed: int = DEFAULT_SEED,
 ) -> Tuple[List[Path], List[Path]]:
     """
-    Quét đệ quy các thư mục ảnh, loại bỏ ảnh trùng với testset và phân chia Train/Val.
+    Chiến lược lấy mẫu cân bằng (Balanced Sampling Strategy) bám sát Mục 1.1 trong models/description.md:
+      1. Quét tìm 12 lô dữ liệu NIH ChestX-ray14 (images_001 -> images_012 hoặc các thư mục con tương ứng).
+      2. Với mỗi lô dữ liệu, trích xuất đúng 1.000 ảnh đầu tiên (loại trừ tuyệt đối ảnh thuộc testset niêm phong).
+      3. Đạt quy mô chuẩn 12.000 ảnh X-quang lồng ngực (12 lô x 1.000 ảnh).
+      4. Phân chia tập dữ liệu: đúng 85% Training (10.200 ảnh) và 15% Validation (1.800 ảnh) với seed cố định 42.
+      5. Nếu tập dữ liệu trên Kaggle là thư mục phẳng hoặc không chia 12 lô (ví dụ sub_NIH/sub_chest), tự động
+         phân bổ cân đối giữa các thư mục con hoặc trích xuất tất định 12.000 ảnh và phân chia 85/15.
     """
-    all_files: List[Path] = []
     extensions = {".png", ".jpg", ".jpeg"}
+    dir_to_files: Dict[Path, List[Path]] = {}
 
     for d in dataset_dirs:
         if not d.exists():
             continue
         for root, _, files in os.walk(d):
+            root_path = Path(root)
+            valid_files = []
             for f in files:
                 ext = os.path.splitext(f)[1].lower()
                 if ext in extensions and f not in sealed_names:
-                    all_files.append(Path(root) / f)
+                    valid_files.append(root_path / f)
+            if valid_files:
+                dir_to_files[root_path] = sorted(valid_files)
 
-    # Loại bỏ file trùng lặp đường dẫn và sắp xếp để seed hoạt động tất định
-    all_files = sorted(list(set(all_files)))
-    logger.info(f"[LOAD] Đã tìm thấy {len(all_files):,} ảnh hợp lệ sau khi loại bỏ testset.")
+    if not dir_to_files:
+        logger.error("[SAMPLE] Không tìm thấy bất kỳ file ảnh hợp lệ nào trong các thư mục chỉ định.")
+        return [], []
 
-    if max_images is not None and max_images < len(all_files):
+    sampled_images: List[Path] = []
+    sorted_dirs = sorted(list(dir_to_files.keys()), key=lambda p: p.name)
+
+    # Nhận diện các thư mục dạng lô dữ liệu (images_001 .. images_012 hoặc các thư mục con)
+    batch_dirs = [d for d in sorted_dirs if any(kw in d.name.lower() for kw in ["images_", "batch_", "sub_"])]
+    if not batch_dirs:
+        # Nếu không có tên chuẩn, lấy các thư mục chứa ảnh
+        batch_dirs = sorted_dirs
+
+    logger.info(f"[SAMPLE] Phát hiện {len(batch_dirs)} thư mục/lô dữ liệu ảnh.")
+
+    # Áp dụng Balanced Sampling: lấy đúng 1.000 ảnh từ mỗi lô
+    for bdir in batch_dirs[:target_batches]:
+        b_files = dir_to_files[bdir]
+        take_count = min(images_per_batch, len(b_files))
+        selected = b_files[:take_count]
+        sampled_images.extend(selected)
+        logger.info(f"  [BATCH] {bdir.name}: Lấy {len(selected):,}/{len(b_files):,} ảnh (Mục tiêu: {images_per_batch})")
+
+    # Nếu tổng số ảnh thu được từ các lô chưa đủ 12.000 và còn ảnh ở các thư mục khác
+    if len(sampled_images) < target_batches * images_per_batch:
+        remaining_pool = []
+        sampled_set = set(sampled_images)
+        for b_files in dir_to_files.values():
+            for f in b_files:
+                if f not in sampled_set:
+                    remaining_pool.append(f)
+        needed = (target_batches * images_per_batch) - len(sampled_images)
+        if needed > 0 and remaining_pool:
+            remaining_pool = sorted(remaining_pool)
+            additional = remaining_pool[:needed]
+            sampled_images.extend(additional)
+            logger.info(f"[SAMPLE] Bổ sung thêm {len(additional):,} ảnh để đạt mục tiêu.")
+
+    # Loại bỏ trùng lặp và sắp xếp lại
+    sampled_images = sorted(list(set(sampled_images)))
+    logger.info(f"[SAMPLE] Tổng số ảnh sau Balanced Sampling: {len(sampled_images):,} ảnh.")
+
+    # Hỗ trợ giới hạn max_images nếu có cờ chạy thử (--dry-run)
+    if max_images is not None and max_images < len(sampled_images):
         random.seed(seed)
-        all_files = random.sample(all_files, max_images)
-        logger.info(f"[LOAD] Giới hạn lấy mẫu: {len(all_files):,} ảnh ngẫu nhiên.")
+        sampled_images = random.sample(sampled_images, max_images)
+        logger.info(f"[SAMPLE] Giới hạn lấy mẫu theo cấu hình: {len(sampled_images):,} ảnh.")
 
+    # Trộn ngẫu nhiên với seed cố định 42 để phân chia Train / Val
     random.seed(seed)
-    random.shuffle(all_files)
+    random.shuffle(sampled_images)
 
-    split_idx = int(len(all_files) * train_ratio)
-    train_files = all_files[:split_idx]
-    val_files = all_files[split_idx:]
+    split_idx = int(len(sampled_images) * train_ratio)
+    train_files = sampled_images[:split_idx]
+    val_files = sampled_images[split_idx:]
 
-    logger.info(f"[SPLIT] Phân chia dữ liệu: Train={len(train_files):,} ảnh (85%), Val={len(val_files):,} ảnh (15%)")
+    logger.info(
+        f"[SPLIT] Phân chia dữ liệu chuẩn 85% - 15% (Seed={seed}):\\n"
+        f"  - Training (85%)   : {len(train_files):,} ảnh (Kỳ vọng: 10.200 khi đủ 12.000)\\n"
+        f"  - Validation (15%) : {len(val_files):,} ảnh (Kỳ vọng: 1.800 khi đủ 12.000)"
+    )
     return train_files, val_files
 
 

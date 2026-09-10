@@ -111,32 +111,79 @@ SEALED_TESTSET_FILES = {
     '00001426_001.png', '00001427_000.png', '00001428_000.png', '00001429_000.png'
 }
 
-def discover_dataset(search_root="/kaggle/input"):
-    all_image_paths = []
+def discover_balanced_dataset(search_root="/kaggle/input", images_per_batch=1000, target_batches=12):
+    \"\"\"
+    Chiến lược lấy mẫu cân bằng (Balanced Sampling Strategy) bám sát Mục 1.1 trong models/description.md:
+      1. Tự động phát hiện 12 lô dữ liệu NIH ChestX-ray14 (images_001 .. images_012 hoặc các thư mục con).
+      2. Với mỗi lô dữ liệu, trích xuất đúng 1.000 ảnh đầu tiên (loại trừ tuyệt đối ảnh thuộc testset niêm phong).
+      3. Đạt quy mô chuẩn 12.000 ảnh X-quang lồng ngực (12 lô x 1.000 ảnh).
+      4. Phân chia tập dữ liệu: đúng 85% Training (10.200 ảnh) và 15% Validation (1.800 ảnh) với seed cố định 42.
+    \"\"\"
     valid_exts = {".png", ".jpg", ".jpeg"}
-    
-    print(f"[SCAN] Đang quét các file ảnh trong {search_root}...")
+    dir_to_files = {}
+
+    print(f"[SCAN] Đang quét cấu trúc tập dữ liệu trong {search_root}...")
     for root, _, files in os.walk(search_root):
+        valid_in_dir = []
         for f in files:
             ext = os.path.splitext(f)[1].lower()
-            if ext in valid_exts:
-                # Cơ chế chống rò rỉ dữ liệu (Anti-Data Leakage)
-                if f not in SEALED_TESTSET_FILES and "degraded_testset" not in root:
-                    all_image_paths.append(os.path.join(root, f))
-                    
-    all_image_paths = sorted(list(set(all_image_paths)))
-    print(f"[SCAN] Tìm thấy tổng cộng {len(all_image_paths):,} ảnh hợp lệ (đã loại trừ toàn bộ tập testset).")
-    return all_image_paths
+            if ext in valid_exts and f not in SEALED_TESTSET_FILES and "degraded_testset" not in root:
+                valid_in_dir.append(os.path.join(root, f))
+        if valid_in_dir:
+            dir_to_files[root] = sorted(valid_in_dir)
 
-IMAGE_PATHS = discover_dataset()
-if len(IMAGE_PATHS) == 0:
-    # Dự phòng nếu người dùng đặt dữ liệu ở thư mục khác
-    print("[WARNING] Không tìm thấy ảnh trong /kaggle/input, đang thử quét thư mục hiện tại...")
-    IMAGE_PATHS = discover_dataset(".")
+    if not dir_to_files:
+        print("[WARNING] Không tìm thấy ảnh trong /kaggle/input, đang thử quét thư mục hiện tại...")
+        for root, _, files in os.walk("."):
+            valid_in_dir = []
+            for f in files:
+                ext = os.path.splitext(f)[1].lower()
+                if ext in valid_exts and f not in SEALED_TESTSET_FILES and "degraded_testset" not in root:
+                    valid_in_dir.append(os.path.join(root, f))
+            if valid_in_dir:
+                dir_to_files[root] = sorted(valid_in_dir)
 
-assert len(IMAGE_PATHS) > 0, "LỖI: Không tìm thấy bất kỳ file ảnh nào! Vui lòng bấm + Add Data để thêm dataset."
+    assert len(dir_to_files) > 0, "LỖI: Không tìm thấy bất kỳ file ảnh nào! Vui lòng bấm + Add Data để thêm dataset."
 
-# Chia tập Train (85%) và Validation (15%)
+    sorted_roots = sorted(list(dir_to_files.keys()), key=lambda p: os.path.basename(p))
+    # Nhận diện các thư mục dạng lô (images_001 .. images_012 hoặc các thư mục con)
+    batch_dirs = [d for d in sorted_roots if any(kw in os.path.basename(d).lower() for kw in ["images_", "batch_", "sub_"])]
+    if not batch_dirs:
+        batch_dirs = sorted_roots
+
+    print(f"[SAMPLE] Phát hiện {len(batch_dirs)} thư mục/lô dữ liệu ảnh.")
+
+    sampled_images = []
+    for bdir in batch_dirs[:target_batches]:
+        files_in_b = dir_to_files[bdir]
+        take_count = min(images_per_batch, len(files_in_b))
+        selected = files_in_b[:take_count]
+        sampled_images.extend(selected)
+        print(f"  [BATCH] {os.path.basename(bdir)}: Lấy {len(selected):,}/{len(files_in_b):,} ảnh (Mục tiêu: {images_per_batch})")
+
+    # Nếu chưa đủ 12.000 ảnh và còn ảnh ở các thư mục khác
+    target_total = target_batches * images_per_batch
+    if len(sampled_images) < target_total:
+        sampled_set = set(sampled_images)
+        remaining = []
+        for b_files in dir_to_files.values():
+            for f in b_files:
+                if f not in sampled_set:
+                    remaining.append(f)
+        needed = target_total - len(sampled_images)
+        if needed > 0 and remaining:
+            remaining = sorted(remaining)
+            additional = remaining[:needed]
+            sampled_images.extend(additional)
+            print(f"[SAMPLE] Bổ sung thêm {len(additional):,} ảnh từ các thư mục khác để tiệm cận mục tiêu.")
+
+    sampled_images = sorted(list(set(sampled_images)))
+    print(f"[SAMPLE] Tổng số ảnh sau Balanced Sampling: {len(sampled_images):,} ảnh.")
+    return sampled_images
+
+IMAGE_PATHS = discover_balanced_dataset()
+
+# Phân chia đúng 85% Training và 15% Validation theo SEED = 42
 random.seed(SEED)
 random.shuffle(IMAGE_PATHS)
 
@@ -145,8 +192,11 @@ SPLIT_IDX = int(len(IMAGE_PATHS) * SPLIT_RATIO)
 TRAIN_PATHS = IMAGE_PATHS[:SPLIT_IDX]
 VAL_PATHS = IMAGE_PATHS[SPLIT_IDX:]
 
-print(f"[DATASET] Tập huấn luyện (Train): {len(TRAIN_PATHS):,} ảnh ({SPLIT_RATIO*100:.0f}%)")
-print(f"[DATASET] Tập kiểm định (Val)   : {len(VAL_PATHS):,} ảnh ({(1-SPLIT_RATIO)*100:.0f}%)")
+print(f"\\n{'='*70}")
+print(f"📊 PHÂN CHIA TẬP DỮ LIỆU CHUẨN MỰC (Theo Mục 1.1 models/description.md):")
+print(f"  - Tập huấn luyện (Train 85%): {len(TRAIN_PATHS):,} ảnh (Kỳ vọng: 10.200 khi đủ 12.000)")
+print(f"  - Tập kiểm định   (Val 15%)  : {len(VAL_PATHS):,} ảnh (Kỳ vọng: 1.800 khi đủ 12.000)")
+print(f"{'='*70}")
 """
     )
     cells.append(cell_data_scan)
