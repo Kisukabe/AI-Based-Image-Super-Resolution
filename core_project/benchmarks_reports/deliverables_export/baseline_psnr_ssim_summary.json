@@ -1,0 +1,127 @@
+{
+  "metadata": {
+    "timestamp": "2026-09-11 01:48:25",
+    "pytorch_version": "2.13.0",
+    "device": "mps",
+    "total_test_images": 338,
+    "compact_checkpoint": "/Users/giabao/Desktop/GitHub/AI-Based-Image-Super-Resolution/core_project/ai_software/checkpoints/compact_srcnn_float32.pth",
+    "orig_checkpoint": "/Users/giabao/Desktop/GitHub/AI-Based-Image-Super-Resolution/core_project/ai_software/checkpoints/srcnn_original_float32.pth",
+    "scale_factor": 2,
+    "metrics_evaluated": [
+      "PSNR",
+      "SSIM",
+      "MSE",
+      "RMSE",
+      "MAE",
+      "EPI (Edge Preservation Index)",
+      "Output Mean",
+      "Output STD",
+      "Delta PSNR",
+      "Delta SSIM",
+      "Delta RMSE",
+      "Delta EPI",
+      "% PSNR Gain > 0",
+      "% SSIM Gain > 0",
+      "Clinical Tiers (4 tiers)",
+      "Inference Latency ms"
+    ]
+  },
+  "summary_table": [
+    {
+      "Model Name": "Bicubic Interpolation 2x",
+      "Param Count": 0,
+      "PSNR Mean ± Std (dB)": "34.7664 ± 1.5820",
+      "PSNR Median (IQR)": "35.0452 (2.5696)",
+      "SSIM Mean ± Std": "0.8475 ± 0.0132",
+      "SSIM Median (IQR)": "0.8473 (0.0192)",
+      "RMSE Mean ± Std": "4.7378 ± 0.8962",
+      "MAE Mean ± Std": "3.1026 ± 0.2088",
+      "EPI Mean ± Std": "0.1207 ± 0.0771",
+      "Output Mean": "136.07",
+      "Output STD": "57.45",
+      "Delta PSNR Mean ± Std (dB)": "0.0000 ± 0.0000 (Baseline)",
+      "Delta SSIM Mean ± Std": "0.0000 ± 0.0000 (Baseline)",
+      "% PSNR Gain > 0": "0.00% (Baseline)",
+      "% SSIM Gain > 0": "0.00% (Baseline)",
+      "Inference Latency (ms)": "0.15 ± 0.21"
+    },
+    {
+      "Model Name": "SRCNN Original Float32",
+      "Param Count": 8129,
+      "PSNR Mean ± Std (dB)": "4.7741 ± 1.1458",
+      "PSNR Median (IQR)": "4.7979 (1.9360)",
+      "SSIM Mean ± Std": "0.0234 ± 0.0290",
+      "SSIM Median (IQR)": "0.0108 (0.0331)",
+      "RMSE Mean ± Std": "148.4464 ± 19.3628",
+      "MAE Mean ± Std": "136.0145 ± 21.6921",
+      "EPI Mean ± Std": "0.0000 ± 0.0000",
+      "Output Mean": "0.00",
+      "Output STD": "0.00",
+      "Delta PSNR Mean ± Std (dB)": "-29.9923 ± 1.6482",
+      "Delta SSIM Mean ± Std": "-0.8241 ± 0.0285",
+      "% PSNR Gain > 0": "0.00%",
+      "% SSIM Gain > 0": "0.00%",
+      "Inference Latency (ms)": "0.48 ± 0.53"
+    },
+    {
+      "Model Name": "Compact SRCNN Float32",
+      "Param Count": 1649,
+      "PSNR Mean ± Std (dB)": "30.5957 ± 2.0483",
+      "PSNR Median (IQR)": "30.6194 (2.9743)",
+      "SSIM Mean ± Std": "0.8986 ± 0.0436",
+      "SSIM Median (IQR)": "0.9113 (0.0653)",
+      "RMSE Mean ± Std": "7.7356 ± 1.7687",
+      "MAE Mean ± Std": "4.2154 ± 1.2141",
+      "EPI Mean ± Std": "0.2805 ± 0.2077",
+      "Output Mean": "137.91",
+      "Output STD": "54.38",
+      "Delta PSNR Mean ± Std (dB)": "-4.1707 ± 2.8014",
+      "Delta SSIM Mean ± Std": "+0.0512 ± 0.0498",
+      "% PSNR Gain > 0": "6.21%",
+      "% SSIM Gain > 0": "84.62%",
+      "Inference Latency (ms)": "0.40 ± 0.08"
+    }
+  ],
+  "clinical_tiers": [
+    {
+      "Clinical Tier": "EXCELLENT",
+      "Tier Definition": "Xuất sắc (PSNR ≥ 40 dB & SSIM ≥ 0.95)",
+      "Bicubic Count": 0,
+      "Bicubic Pct (%)": "0.00%",
+      "SRCNN Orig Count": 0,
+      "SRCNN Orig Pct (%)": "0.00%",
+      "Compact SRCNN Count": 0,
+      "Compact SRCNN Pct (%)": "0.00%"
+    },
+    {
+      "Clinical Tier": "GOOD",
+      "Tier Definition": "Tốt (35 ≤ PSNR < 40 dB)",
+      "Bicubic Count": 171,
+      "Bicubic Pct (%)": "50.59%",
+      "SRCNN Orig Count": 0,
+      "SRCNN Orig Pct (%)": "0.00%",
+      "Compact SRCNN Count": 8,
+      "Compact SRCNN Pct (%)": "2.37%"
+    },
+    {
+      "Clinical Tier": "ACCEPTABLE",
+      "Tier Definition": "Đạt chuẩn lâm sàng (30 ≤ PSNR < 35 dB)",
+      "Bicubic Count": 167,
+      "Bicubic Pct (%)": "49.41%",
+      "SRCNN Orig Count": 0,
+      "SRCNN Orig Pct (%)": "0.00%",
+      "Compact SRCNN Count": 183,
+      "Compact SRCNN Pct (%)": "54.14%"
+    },
+    {
+      "Clinical Tier": "UNACCEPTABLE",
+      "Tier Definition": "Không đạt chuẩn (PSNR < 30 dB)",
+      "Bicubic Count": 0,
+      "Bicubic Pct (%)": "0.00%",
+      "SRCNN Orig Count": 338,
+      "SRCNN Orig Pct (%)": "100.00%",
+      "Compact SRCNN Count": 147,
+      "Compact SRCNN Pct (%)": "43.49%"
+    }
+  ]
+}

@@ -28,6 +28,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 from PIL import Image
+from scipy.ndimage import convolve
 from skimage.metrics import peak_signal_noise_ratio, structural_similarity
 
 # ------------------------------------------------------------------------------
@@ -69,6 +70,8 @@ class FullReferenceMetrics:
     ssim: float
     mse: float
     rmse: float
+    mae: float
+    epi: float
     img_mean: float
     img_std: float
 
@@ -89,6 +92,14 @@ def compute_rmse(img_sr: np.ndarray, img_hr: np.ndarray) -> float:
     return float(np.sqrt(compute_mse(img_sr, img_hr)))
 
 
+def compute_mae(img_sr: np.ndarray, img_hr: np.ndarray) -> float:
+    """Tính sai số tuyệt đối trung bình (MAE / khoảng cách L1) giữa 2 mảng ảnh."""
+    if img_sr.shape != img_hr.shape:
+        raise ValueError(f"[VALIDATE] Kích thước ảnh không khớp: {img_sr.shape} != {img_hr.shape}")
+    diff = np.abs(img_sr.astype(np.float64) - img_hr.astype(np.float64))
+    return float(np.mean(diff))
+
+
 def compute_psnr(img_sr: np.ndarray, img_hr: np.ndarray, data_range: float = 255.0) -> float:
     """Tính Peak Signal-to-Noise Ratio (PSNR) theo chuẩn dB."""
     mse = compute_mse(img_sr, img_hr)
@@ -100,6 +111,31 @@ def compute_psnr(img_sr: np.ndarray, img_hr: np.ndarray, data_range: float = 255
 def compute_ssim(img_sr: np.ndarray, img_hr: np.ndarray, data_range: float = 255.0) -> float:
     """Tính Structural Similarity Index (SSIM)."""
     return float(structural_similarity(img_hr, img_sr, data_range=data_range))
+
+
+def compute_epi(img_sr: np.ndarray, img_hr: np.ndarray) -> float:
+    """
+    Tính chỉ số bảo toàn biên cạnh giải phẫu Edge Preservation Index (EPI).
+    Sử dụng bộ lọc thông cao Laplacian 3x3 để trích xuất gradient biên cạnh.
+    
+    Công thức:
+      EPI = sum((d_sr - mean(d_sr)) * (d_hr - mean(d_hr))) /
+            sqrt(sum((d_sr - mean(d_sr))²) * sum((d_hr - mean(d_hr))²))
+    """
+    if img_sr.shape != img_hr.shape:
+        raise ValueError(f"[VALIDATE] Kích thước ảnh không khớp: {img_sr.shape} != {img_hr.shape}")
+    kernel = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]], dtype=np.float64)
+    d_sr = convolve(img_sr.astype(np.float64), kernel, mode="reflect")
+    d_hr = convolve(img_hr.astype(np.float64), kernel, mode="reflect")
+
+    d_sr_zero = d_sr - np.mean(d_sr)
+    d_hr_zero = d_hr - np.mean(d_hr)
+
+    numerator = np.sum(d_sr_zero * d_hr_zero)
+    denominator = np.sqrt(np.sum(d_sr_zero ** 2) * np.sum(d_hr_zero ** 2))
+    if denominator < 1e-10:
+        return 1.0 if np.allclose(img_sr, img_hr) else 0.0
+    return float(numerator / denominator)
 
 
 def compute_cnr(
@@ -126,8 +162,10 @@ def evaluate_pair(img_sr: np.ndarray, img_hr: np.ndarray) -> FullReferenceMetric
     """Đánh giá toàn diện một cặp ảnh SR và HR theo mọi tiêu chuẩn full-ref cơ bản."""
     mse_val = compute_mse(img_sr, img_hr)
     rmse_val = float(np.sqrt(mse_val))
+    mae_val = compute_mae(img_sr, img_hr)
     psnr_val = compute_psnr(img_sr, img_hr)
     ssim_val = compute_ssim(img_sr, img_hr)
+    epi_val = compute_epi(img_sr, img_hr)
     img_mean = float(np.mean(img_sr.astype(np.float64)))
     img_std = float(np.std(img_sr.astype(np.float64)))
 
@@ -136,6 +174,8 @@ def evaluate_pair(img_sr: np.ndarray, img_hr: np.ndarray) -> FullReferenceMetric
         ssim=ssim_val,
         mse=mse_val,
         rmse=rmse_val,
+        mae=mae_val,
+        epi=epi_val,
         img_mean=img_mean,
         img_std=img_std,
     )
