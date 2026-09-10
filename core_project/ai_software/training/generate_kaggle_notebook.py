@@ -119,11 +119,11 @@ def discover_balanced_dataset(search_root="/kaggle/input", images_per_batch=1000
       3. Đạt quy mô chuẩn 12.000 ảnh X-quang lồng ngực (12 lô x 1.000 ảnh).
       4. Phân chia tập dữ liệu: đúng 85% Training (10.200 ảnh) và 15% Validation (1.800 ảnh) với seed cố định 42.
     \"\"\"
-    valid_exts = {".png", ".jpg", ".jpeg"}
-    dir_to_files = {}
-
+    ignored_dir_keywords = {"__results___files", "__pycache__", ".ipynb_checkpoints", "checkpoint", ".git", "working"}
     print(f"[SCAN] Đang quét cấu trúc tập dữ liệu trong {search_root}...")
     for root, _, files in os.walk(search_root):
+        if any(ign in root for ign in ignored_dir_keywords):
+            continue
         valid_in_dir = []
         for f in files:
             ext = os.path.splitext(f)[1].lower()
@@ -135,6 +135,8 @@ def discover_balanced_dataset(search_root="/kaggle/input", images_per_batch=1000
     if not dir_to_files:
         print("[WARNING] Không tìm thấy ảnh trong /kaggle/input, đang thử quét thư mục hiện tại...")
         for root, _, files in os.walk("."):
+            if any(ign in root for ign in ignored_dir_keywords):
+                continue
             valid_in_dir = []
             for f in files:
                 ext = os.path.splitext(f)[1].lower()
@@ -143,7 +145,13 @@ def discover_balanced_dataset(search_root="/kaggle/input", images_per_batch=1000
             if valid_in_dir:
                 dir_to_files[root] = sorted(valid_in_dir)
 
-    assert len(dir_to_files) > 0, "LỖI: Không tìm thấy bất kỳ file ảnh nào! Vui lòng bấm + Add Data để thêm dataset."
+    total_raw_found = sum(len(v) for v in dir_to_files.values())
+    if total_raw_found < 50:
+        raise ValueError(
+            f"LỖI DỮ LIỆU: Chỉ tìm thấy {total_raw_found} file ảnh hợp lệ trong {search_root}. "
+            "Tập dữ liệu NIH ChestX-ray chưa được gắn vào Notebook hoặc gắn nhầm thư mục output. "
+            "Vui lòng nhấp vào '+ Add Input' ở thanh công cụ bên phải của Kaggle, tìm kiếm và gắn dataset ảnh X-quang vào Notebook."
+        )
 
     sorted_roots = sorted(list(dir_to_files.keys()), key=lambda p: os.path.basename(p))
     # Nhận diện các thư mục dạng lô (images_001 .. images_012 hoặc các thư mục con)

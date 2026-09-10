@@ -201,10 +201,13 @@ def scan_and_split_dataset(
     extensions = {".png", ".jpg", ".jpeg"}
     dir_to_files: Dict[Path, List[Path]] = {}
 
+    ignored_keywords = {"__results___files", "__pycache__", ".ipynb_checkpoints", "checkpoint", ".git", "working"}
     for d in dataset_dirs:
         if not d.exists():
             continue
         for root, _, files in os.walk(d):
+            if any(ign in root for ign in ignored_keywords):
+                continue
             root_path = Path(root)
             valid_files = []
             for f in files:
@@ -217,6 +220,13 @@ def scan_and_split_dataset(
     if not dir_to_files:
         logger.error("[SAMPLE] Không tìm thấy bất kỳ file ảnh hợp lệ nào trong các thư mục chỉ định.")
         return [], []
+
+    total_raw_found = sum(len(v) for v in dir_to_files.values())
+    if total_raw_found < 50:
+        logger.warning(
+            f"[SAMPLE] Cảnh báo: Chỉ tìm thấy {total_raw_found} file ảnh. "
+            "Nếu chạy thực tế, hãy kiểm tra lại đường dẫn dataset để đảm bảo đủ dữ liệu huấn luyện."
+        )
 
     sampled_images: List[Path] = []
     sorted_dirs = sorted(list(dir_to_files.keys()), key=lambda p: p.name)
