@@ -1,0 +1,190 @@
+{
+  "project_name": "AI-Based Medical Image Super-Resolution FPGA Acceleration",
+  "target_hardware": "Xilinx Zynq-7020 (PYNQ-Z2)",
+  "rtl_model": "Compact SRCNN (1 -> 16 -> 8 -> 1, 1,649 parameters)",
+  "arithmetic_spec": {
+    "pixel_format": "S7.0 (8-bit signed [-128, 127], offset 128)",
+    "weight_format": "S0.7 (8-bit signed [-1.0, +0.992])",
+    "bias_format": "S24.7 (32-bit signed hex)",
+    "accumulator_format": "S24.7 (32-bit signed integer)",
+    "activation": "ReLU clamped to [0, 127] for L1/L2; +128 clamped to [0, 255] for L3"
+  },
+  "timestamp": "2026-09-11 00:02:52",
+  "total_scenarios_executed": 4,
+  "scenarios_passed": 4,
+  "scenarios_failed": 0,
+  "overall_status": "ALL_PASS",
+  "scenarios": [
+    {
+      "scenario_id": 1,
+      "scenario_name": "RTL_Functional_4x4",
+      "description": "Xác nhận bit-exact 100% với vector testbench tb_axis_functional.v (4x4)",
+      "total_pixels": 16,
+      "matched_pixels": 16,
+      "mismatched_pixels": 0,
+      "exact_bit_match_rate": 100.0,
+      "mae_lsb": 0.0,
+      "max_delta_lsb": 0,
+      "passed": true,
+      "overflow_detected": false,
+      "execution_time_ms": 0.28,
+      "mismatch_samples": [],
+      "metadata": {
+        "input_shape": [
+          4,
+          4
+        ],
+        "weight_file": "functional_weights.txt",
+        "bias_file": "functional_biases.txt",
+        "rtl_testbench": "tb_axis_functional.v"
+      }
+    },
+    {
+      "scenario_id": 2,
+      "scenario_name": "Full_Patch_128x128_Trained_Weights",
+      "description": "Xác nhận bit-exact 100% trên patch 128x128 với trọng số thực nạp chip",
+      "total_pixels": 16384,
+      "matched_pixels": 16384,
+      "mismatched_pixels": 0,
+      "exact_bit_match_rate": 100.0,
+      "mae_lsb": 0.0,
+      "max_delta_lsb": 0,
+      "passed": true,
+      "overflow_detected": false,
+      "execution_time_ms": 0.09,
+      "mismatch_samples": [],
+      "metadata": {
+        "input_shape": [
+          128,
+          128
+        ],
+        "total_patch_words": 4096,
+        "weight_file": "weights_hex_clean.txt",
+        "bias_file": "biases_hex_clean.txt"
+      }
+    },
+    {
+      "scenario_id": 3,
+      "scenario_name": "Full_Medical_Image_1024x1024",
+      "description": "Xác nhận tính toàn vẹn 100% pixel và kiểm tra tràn số trên ảnh y tế 1024x1024",
+      "total_pixels": 1048576,
+      "matched_pixels": 1048576,
+      "mismatched_pixels": 0,
+      "exact_bit_match_rate": 100.0,
+      "mae_lsb": 0.0,
+      "max_delta_lsb": 0,
+      "passed": true,
+      "overflow_detected": false,
+      "execution_time_ms": 4.41,
+      "mismatch_samples": [],
+      "metadata": {
+        "image_name": "00001336_000.png",
+        "image_size": [
+          1024,
+          1024
+        ],
+        "overflow_stats": {
+          "Layer1": {
+            "min_acc": -8325,
+            "max_acc": 8325,
+            "safe_margin_min": 2147475323,
+            "safe_margin_max": 2147475322
+          },
+          "Layer2": {
+            "min_acc": 0,
+            "max_acc": 16640,
+            "safe_margin_min": 2147483648,
+            "safe_margin_max": 2147467007
+          },
+          "Layer3": {
+            "min_acc": -16256,
+            "max_acc": 15616,
+            "safe_margin_min": 2147467392,
+            "safe_margin_max": 2147468031
+          }
+        }
+      }
+    },
+    {
+      "scenario_id": 4,
+      "scenario_name": "Fault_Injection_Sensitivity",
+      "description": "Kiểm tra độ nhạy Scoreboard khi bị bơm nhân tạo 5 lỗi sai lệch LSB",
+      "total_pixels": 4096,
+      "matched_pixels": 4091,
+      "mismatched_pixels": 5,
+      "exact_bit_match_rate": 99.8779,
+      "mae_lsb": 0.001465,
+      "max_delta_lsb": 2,
+      "passed": true,
+      "overflow_detected": false,
+      "execution_time_ms": 0.1,
+      "mismatch_samples": [
+        {
+          "y": 5,
+          "x": 12,
+          "dut_value": 63,
+          "golden_value": 62,
+          "delta": 1
+        },
+        {
+          "y": 18,
+          "x": 30,
+          "dut_value": 119,
+          "golden_value": 118,
+          "delta": 1
+        },
+        {
+          "y": 32,
+          "x": 45,
+          "dut_value": 173,
+          "golden_value": 174,
+          "delta": -1
+        },
+        {
+          "y": 50,
+          "x": 10,
+          "dut_value": 115,
+          "golden_value": 114,
+          "delta": 1
+        },
+        {
+          "y": 60,
+          "x": 58,
+          "dut_value": 158,
+          "golden_value": 156,
+          "delta": 2
+        }
+      ],
+      "metadata": {
+        "injected_faults_count": 5,
+        "injected_coords": [
+          {
+            "y": 5,
+            "x": 12,
+            "injected_delta": 1
+          },
+          {
+            "y": 18,
+            "x": 30,
+            "injected_delta": 1
+          },
+          {
+            "y": 32,
+            "x": 45,
+            "injected_delta": -1
+          },
+          {
+            "y": 50,
+            "x": 10,
+            "injected_delta": 1
+          },
+          {
+            "y": 60,
+            "x": 58,
+            "injected_delta": 2
+          }
+        ]
+      }
+    }
+  ]
+}
