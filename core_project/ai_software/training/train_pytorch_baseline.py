@@ -228,30 +228,36 @@ def scan_and_split_dataset(
             "Nếu chạy thực tế, hãy kiểm tra lại đường dẫn dataset để đảm bảo đủ dữ liệu huấn luyện."
         )
 
+    # Gom nhóm các file ảnh theo từng lô dữ liệu chuẩn (images_001 .. images_012 hoặc các thư mục con)
+    def get_batch_label(path: Path) -> str:
+        for part in reversed(path.parts[:-1]):
+            if any(kw in part.lower() for kw in ["images_", "batch_", "sub_"]):
+                return part
+        return path.parent.name
+
+    batch_groups: Dict[str, List[Path]] = {}
+    for files_list in dir_to_files.values():
+        for f in files_list:
+            label = get_batch_label(f)
+            batch_groups.setdefault(label, []).append(f)
+
+    sorted_batch_labels = sorted(list(batch_groups.keys()))
+    logger.info(f"[SAMPLE] Phát hiện {len(sorted_batch_labels)} thư mục/lô dữ liệu ảnh.")
+
     sampled_images: List[Path] = []
-    sorted_dirs = sorted(list(dir_to_files.keys()), key=lambda p: p.name)
-
-    # Nhận diện các thư mục dạng lô dữ liệu (images_001 .. images_012 hoặc các thư mục con)
-    batch_dirs = [d for d in sorted_dirs if any(kw in d.name.lower() for kw in ["images_", "batch_", "sub_"])]
-    if not batch_dirs:
-        # Nếu không có tên chuẩn, lấy các thư mục chứa ảnh
-        batch_dirs = sorted_dirs
-
-    logger.info(f"[SAMPLE] Phát hiện {len(batch_dirs)} thư mục/lô dữ liệu ảnh.")
-
     # Áp dụng Balanced Sampling: lấy đúng 1.000 ảnh từ mỗi lô
-    for bdir in batch_dirs[:target_batches]:
-        b_files = dir_to_files[bdir]
+    for label in sorted_batch_labels[:target_batches]:
+        b_files = sorted(batch_groups[label])
         take_count = min(images_per_batch, len(b_files))
         selected = b_files[:take_count]
         sampled_images.extend(selected)
-        logger.info(f"  [BATCH] {bdir.name}: Lấy {len(selected):,}/{len(b_files):,} ảnh (Mục tiêu: {images_per_batch})")
+        logger.info(f"  [BATCH] {label}: Lấy {len(selected):,}/{len(b_files):,} ảnh (Mục tiêu: {images_per_batch})")
 
     # Nếu tổng số ảnh thu được từ các lô chưa đủ 12.000 và còn ảnh ở các thư mục khác
     if len(sampled_images) < target_batches * images_per_batch:
         remaining_pool = []
         sampled_set = set(sampled_images)
-        for b_files in dir_to_files.values():
+        for b_files in batch_groups.values():
             for f in b_files:
                 if f not in sampled_set:
                     remaining_pool.append(f)

@@ -153,28 +153,37 @@ def discover_balanced_dataset(search_root="/kaggle/input", images_per_batch=1000
             "Vui lòng nhấp vào '+ Add Input' ở thanh công cụ bên phải của Kaggle, tìm kiếm và gắn dataset ảnh X-quang vào Notebook."
         )
 
-    sorted_roots = sorted(list(dir_to_files.keys()), key=lambda p: os.path.basename(p))
-    # Nhận diện các thư mục dạng lô (images_001 .. images_012 hoặc các thư mục con)
-    batch_dirs = [d for d in sorted_roots if any(kw in os.path.basename(d).lower() for kw in ["images_", "batch_", "sub_"])]
-    if not batch_dirs:
-        batch_dirs = sorted_roots
+    # Gom nhóm các file ảnh theo từng lô dữ liệu chuẩn (images_001 .. images_012 hoặc các thư mục con)
+    def get_batch_label(path_str):
+        parts = Path(path_str).parts
+        for part in reversed(parts[:-1]):
+            if any(kw in part.lower() for kw in ["images_", "batch_", "sub_"]):
+                return part
+        return Path(path_str).parent.name
 
-    print(f"[SAMPLE] Phát hiện {len(batch_dirs)} thư mục/lô dữ liệu ảnh.")
+    batch_groups = {}
+    for files_list in dir_to_files.values():
+        for f in files_list:
+            label = get_batch_label(f)
+            batch_groups.setdefault(label, []).append(f)
+
+    sorted_batch_labels = sorted(list(batch_groups.keys()))
+    print(f"[SAMPLE] Phát hiện {len(sorted_batch_labels)} thư mục/lô dữ liệu ảnh.")
 
     sampled_images = []
-    for bdir in batch_dirs[:target_batches]:
-        files_in_b = dir_to_files[bdir]
+    for label in sorted_batch_labels[:target_batches]:
+        files_in_b = sorted(batch_groups[label])
         take_count = min(images_per_batch, len(files_in_b))
         selected = files_in_b[:take_count]
         sampled_images.extend(selected)
-        print(f"  [BATCH] {os.path.basename(bdir)}: Lấy {len(selected):,}/{len(files_in_b):,} ảnh (Mục tiêu: {images_per_batch})")
+        print(f"  [BATCH] {label}: Lấy {len(selected):,}/{len(files_in_b):,} ảnh (Mục tiêu: {images_per_batch})")
 
-    # Nếu chưa đủ 12.000 ảnh và còn ảnh ở các thư mục khác
+    # Nếu chưa đủ 12.000 ảnh và còn ảnh ở các lô khác
     target_total = target_batches * images_per_batch
     if len(sampled_images) < target_total:
         sampled_set = set(sampled_images)
         remaining = []
-        for b_files in dir_to_files.values():
+        for b_files in batch_groups.values():
             for f in b_files:
                 if f not in sampled_set:
                     remaining.append(f)
