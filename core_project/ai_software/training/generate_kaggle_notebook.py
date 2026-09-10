@@ -87,6 +87,8 @@ if torch.cuda.is_available():
     cell_data_scan = nbf.v4.new_code_cell(
 """# Cell 2: Tự động quét và phát hiện tập dữ liệu ảnh trong /kaggle/input (Chống rò rỉ dữ liệu)
 
+SEED = 42
+
 # 338 tên file thuộc tập testset đã niêm phong (Sealed Testset)
 SEALED_TESTSET_FILES = {
     '00001336_000.png', '00001337_000.png', '00001338_000.png', '00001338_001.png', '00001338_002.png',
