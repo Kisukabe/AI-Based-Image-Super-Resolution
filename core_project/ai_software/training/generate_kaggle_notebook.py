@@ -119,6 +119,8 @@ def discover_balanced_dataset(search_root="/kaggle/input", images_per_batch=1000
       3. Đạt quy mô chuẩn 12.000 ảnh X-quang lồng ngực (12 lô x 1.000 ảnh).
       4. Phân chia tập dữ liệu: đúng 85% Training (10.200 ảnh) và 15% Validation (1.800 ảnh) với seed cố định 42.
     \"\"\"
+    valid_exts = {".png", ".jpg", ".jpeg"}
+    dir_to_files = {}
     ignored_dir_keywords = {"__results___files", "__pycache__", ".ipynb_checkpoints", "checkpoint", ".git", "working"}
     print(f"[SCAN] Đang quét cấu trúc tập dữ liệu trong {search_root}...")
     for root, _, files in os.walk(search_root):
