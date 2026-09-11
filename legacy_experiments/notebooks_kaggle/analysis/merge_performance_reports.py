@@ -43,6 +43,8 @@ CHARTS_PART2 = [
 
 def create_master_cover_page() -> plt.Figure:
     """Tạo trang bìa chính và bảng mục lục tổng hợp hai phân hệ."""
+    import matplotlib.patches as patches
+
     fig, ax = plt.subplots(figsize=(12.0, 8.0))
     fig.patch.set_facecolor("#f8fafd")
     ax.set_facecolor("#f8fafd")
@@ -51,85 +53,136 @@ def create_master_cover_page() -> plt.Figure:
     # Header
     fig.text(
         0.5,
-        0.94,
+        0.955,
         "BÁO CÁO TỔNG HỢP SO SÁNH HIỆU NĂNG CÁC MÔ HÌNH SIÊU PHÂN GIẢI",
         ha="center",
         va="top",
-        fontsize=14.5,
+        fontsize=14.0,
         fontweight="bold",
         color="#1a3a5c",
         fontfamily="DejaVu Sans",
     )
     fig.text(
         0.5,
-        0.895,
-        "Đánh giá toàn diện: Bicubic | 6 Mô hình Phần mềm (Software) | Tăng tốc Phần cứng FPGA RTL (Q7)",
+        0.918,
+        "Đánh giá toàn diện: Bicubic | 6 Mô hình Phần mềm (SRCNN Model: 1-64-32-1) | Tăng tốc Phần cứng FPGA RTL (Compact SRCNN: 1-16-8-1, Q7)",
         ha="center",
         va="top",
-        fontsize=11.0,
+        fontsize=10.0,
         style="italic",
         color="#2b6cb0",
         fontfamily="DejaVu Sans",
     )
 
-    # Divider
-    fig.lines.append(
-        plt.Line2D([0.08, 0.92], [0.865, 0.865], transform=fig.transFigure, color="#1a3a5c", linewidth=1.8)
+    # Architecture Distinction Callout Box
+    rect = patches.FancyBboxPatch(
+        (0.08, 0.772),
+        0.84,
+        0.112,
+        boxstyle="round,pad=0.010,rounding_size=0.015",
+        edgecolor="#2b6cb0",
+        facecolor="#eef5fc",
+        linewidth=1.3,
+        transform=fig.transFigure,
+    )
+    fig.patches.append(rect)
+
+    fig.text(
+        0.095,
+        0.868,
+        "ĐẶC TẢ PHÂN BIỆT KIẾN TRÚC SRCNN (PHẦN MỀM vs PHẦN CỨNG RTL):",
+        ha="left",
+        va="top",
+        fontsize=9.5,
+        fontweight="bold",
+        color="#0f2b48",
+        fontfamily="DejaVu Sans",
+    )
+    fig.text(
+        0.095,
+        0.838,
+        "• SRCNN Model (Phần mềm Baseline): Kiến trúc 1 -> 64 -> 32 -> 1 (Tổng 8.129 tham số, FP32, trích xuất đặc trưng sâu 64 và 32 kênh)",
+        ha="left",
+        va="top",
+        fontsize=9.0,
+        color="#1a3a5c",
+        fontfamily="DejaVu Sans",
+    )
+    fig.text(
+        0.095,
+        0.810,
+        "• Compact SRCNN RTL (Phần cứng FPGA): Kiến trúc thu gọn 1 -> 16 -> 8 -> 1 (Tổng 1.649 tham số, Fixed-Point Q7 S7.0/S0.7/S24.7)",
+        ha="left",
+        va="top",
+        fontsize=9.0,
+        color="#1a3a5c",
+        fontfamily="DejaVu Sans",
+    )
+    fig.text(
+        0.095,
+        0.783,
+        "  -> Tối ưu hóa triệt để tài nguyên DSP slice / BRAM / LUT trên chip Xilinx Zynq-7020 (PYNQ-Z2), đạt thông lượng thời gian thực.",
+        ha="left",
+        va="top",
+        fontsize=8.5,
+        style="italic",
+        color="#4a5568",
+        fontfamily="DejaVu Sans",
     )
 
     # TOC Header
     fig.text(
         0.08,
-        0.83,
+        0.735,
         "MỤC LỤC TỔNG HỢP (TABLE OF CONTENTS):",
         ha="left",
         va="top",
-        fontsize=12.0,
+        fontsize=11.0,
         fontweight="bold",
         color="#222222",
         fontfamily="DejaVu Sans",
     )
 
     toc_items = [
-        ("part", "PHẦN I: SO SÁNH HIỆU NĂNG BICUBIC VÀ 6 MODEL PHẦN MỀM (SRCNN, ESPCN, FSRCNN, VDSR, EDSR, SRGAN)", None, 0.77),
-        ("sec", "  1. Tập dữ liệu sub_NIH (NIH ChestX-ray14)", None, 0.725),
-        ("item", "     • Tỉ lệ phóng đại: Scale 2x", 2, 0.685),
-        ("item", "     • Tỉ lệ phóng đại: Scale 3x", 3, 0.650),
-        ("item", "     • Tỉ lệ phóng đại: Scale 4x", 4, 0.615),
-        ("sec", "  2. Tập dữ liệu sub_chest (Chest X-ray Clinical)", None, 0.570),
-        ("item", "     • Tỉ lệ phóng đại: Scale 2x", 5, 0.530),
-        ("item", "     • Tỉ lệ phóng đại: Scale 3x", 6, 0.495),
-        ("item", "     • Tỉ lệ phóng đại: Scale 4x", 7, 0.460),
-        ("part", "PHẦN II: SO SÁNH HIỆU NĂNG ĐỐI ĐẦU PHẦN CỨNG (BICUBIC vs SRCNN RTL Q7 vs SWIFT-SRGAN Q7)", None, 0.395),
-        ("sec", "  1. Tập dữ liệu sub_NIH (NIH ChestX-ray14)", None, 0.350),
-        ("item", "     • Tỉ lệ phóng đại: Scale 2x", 8, 0.310),
-        ("item", "     • Tỉ lệ phóng đại: Scale 3x", 9, 0.275),
-        ("item", "     • Tỉ lệ phóng đại: Scale 4x", 10, 0.240),
-        ("sec", "  2. Tập dữ liệu sub_chest (Chest X-ray Clinical)", None, 0.195),
-        ("item", "     • Tỉ lệ phóng đại: Scale 2x", 11, 0.155),
-        ("item", "     • Tỉ lệ phóng đại: Scale 3x", 12, 0.120),
-        ("item", "     • Tỉ lệ phóng đại: Scale 4x", 13, 0.085),
+        ("part", "PHẦN I: SO SÁNH HIỆU NĂNG BICUBIC VÀ 6 MODEL PHẦN MỀM (SRCNN Model [1-64-32-1, 8.129 params], ESPCN, FSRCNN, VDSR, EDSR, SRGAN)", None, 0.696),
+        ("sec", "  1. Tập dữ liệu sub_NIH (NIH ChestX-ray14)", None, 0.662),
+        ("item", "     • Tỉ lệ phóng đại: Scale 2x", 2, 0.632),
+        ("item", "     • Tỉ lệ phóng đại: Scale 3x", 3, 0.603),
+        ("item", "     • Tỉ lệ phóng đại: Scale 4x", 4, 0.574),
+        ("sec", "  2. Tập dữ liệu sub_chest (Chest X-ray Clinical)", None, 0.540),
+        ("item", "     • Tỉ lệ phóng đại: Scale 2x", 5, 0.510),
+        ("item", "     • Tỉ lệ phóng đại: Scale 3x", 6, 0.481),
+        ("item", "     • Tỉ lệ phóng đại: Scale 4x", 7, 0.452),
+        ("part", "PHẦN II: SO SÁNH HIỆU NĂNG ĐỐI ĐẦU PHẦN CỨNG (BICUBIC vs COMPACT SRCNN RTL [1-16-8-1, 1.649 params, Q7] vs SWIFT-SRGAN Q7)", None, 0.405),
+        ("sec", "  1. Tập dữ liệu sub_NIH (NIH ChestX-ray14)", None, 0.371),
+        ("item", "     • Tỉ lệ phóng đại: Scale 2x", 8, 0.341),
+        ("item", "     • Tỉ lệ phóng đại: Scale 3x", 9, 0.312),
+        ("item", "     • Tỉ lệ phóng đại: Scale 4x", 10, 0.283),
+        ("sec", "  2. Tập dữ liệu sub_chest (Chest X-ray Clinical)", None, 0.249),
+        ("item", "     • Tỉ lệ phóng đại: Scale 2x", 11, 0.219),
+        ("item", "     • Tỉ lệ phóng đại: Scale 3x", 12, 0.190),
+        ("item", "     • Tỉ lệ phóng đại: Scale 4x", 13, 0.161),
     ]
 
     for itype, text, page, y in toc_items:
         if itype == "part":
-            fig.text(0.08, y, text, ha="left", va="center", fontsize=10.5, fontweight="bold", color="#0f2b48", fontfamily="DejaVu Sans")
+            fig.text(0.08, y, text, ha="left", va="center", fontsize=9.8, fontweight="bold", color="#0f2b48", fontfamily="DejaVu Sans")
         elif itype == "sec":
-            fig.text(0.10, y, text, ha="left", va="center", fontsize=10.0, fontweight="bold", color="#1a3a5c", fontfamily="DejaVu Sans")
+            fig.text(0.10, y, text, ha="left", va="center", fontsize=9.2, fontweight="bold", color="#1a3a5c", fontfamily="DejaVu Sans")
         else:
-            fig.text(0.12, y, text, ha="left", va="center", fontsize=9.5, color="#333333", fontfamily="DejaVu Sans")
+            fig.text(0.12, y, text, ha="left", va="center", fontsize=8.8, color="#333333", fontfamily="DejaVu Sans")
             fig.lines.append(
-                plt.Line2D([0.55, 0.84], [y, y], transform=fig.transFigure, color="#bbbbbb", linestyle=":", linewidth=1.0)
+                plt.Line2D([0.58, 0.84], [y, y], transform=fig.transFigure, color="#bbbbbb", linestyle=":", linewidth=0.9)
             )
-            fig.text(0.89, y, f"Trang {page}", ha="right", va="center", fontsize=9.5, fontweight="bold", color="#1a3a5c", fontfamily="DejaVu Sans")
+            fig.text(0.89, y, f"Trang {page}", ha="right", va="center", fontsize=8.8, fontweight="bold", color="#1a3a5c", fontfamily="DejaVu Sans")
 
     fig.text(
         0.5,
-        0.03,
+        0.035,
         "AI-Based Image Super-Resolution for Medical Imaging | FPGA Xilinx Zynq-7020 Acceleration",
         ha="center",
         va="bottom",
-        fontsize=9.0,
+        fontsize=8.5,
         style="italic",
         color="#777777",
         fontfamily="DejaVu Sans",
@@ -163,14 +216,14 @@ def generate_merged_pdf(output_path: Path = OUT_PDF) -> Path:
     doc = pymupdf.open(str(output_path))
     toc = [
         [1, "Trang Bìa & Mục Lục Tổng Hợp", 1],
-        [1, "PHẦN I: So Sánh Hiệu Năng Bicubic và 6 Model Phần Mềm", 2],
+        [1, "PHẦN I: So Sánh 6 Model Phần Mềm (SRCNN Model: 1-64-32-1 [8.129 params])", 2],
         [2, "Tập dữ liệu sub_NIH - Scale 2x", 2],
         [2, "Tập dữ liệu sub_NIH - Scale 3x", 3],
         [2, "Tập dữ liệu sub_NIH - Scale 4x", 4],
         [2, "Tập dữ liệu sub_chest - Scale 2x", 5],
         [2, "Tập dữ liệu sub_chest - Scale 3x", 6],
         [2, "Tập dữ liệu sub_chest - Scale 4x", 7],
-        [1, "PHẦN II: So Sánh Hiệu Năng Đối Đầu Phần Cứng (Bicubic vs SRCNN RTL Q7 vs Swift-SRGAN Q7)", 8],
+        [1, "PHẦN II: Đối Đầu Phần Cứng (Compact SRCNN RTL: 1-16-8-1 [1.649 params, Q7] vs Swift-SRGAN)", 8],
         [2, "Tập dữ liệu sub_NIH - Scale 2x", 8],
         [2, "Tập dữ liệu sub_NIH - Scale 3x", 9],
         [2, "Tập dữ liệu sub_NIH - Scale 4x", 10],

@@ -7,7 +7,7 @@ Trong lĩnh vực Siêu phân giải hình ảnh (Single Image Super-Resolution 
 
 ### 1. Bảng So Sánh Tổng Hợp Đa Chiều
 
-| Tiêu chí | CNN thuần (SRCNN, ESPCN, FSRCNN) | ResNet (VDSR, EDSR, SRResNet) | GAN (SRGAN, ESRGAN) |
+| Tiêu chí | CNN thuần (SRCNN Model: 1-64-32-1, Compact SRCNN RTL: 1-16-8-1, ESPCN, FSRCNN) | ResNet (VDSR, EDSR, SRResNet) | GAN (SRGAN, ESRGAN) |
 | :--- | :--- | :--- | :--- |
 | **Năm công bố tiêu biểu** | 2014 – 2016 | 2016 – 2017 | 2017 – 2018+ |
 | **Cơ chế kiến trúc cốt lõi** | Tích chập tuần tự (feed-forward phẳng, không có skip connections). | **Skip Connections** (kết nối tắt), học phần thặng dư (Residual: y = F(x) + x). | **2 mạng đối kháng:** Generator (tạo ảnh) đối đầu Discriminator (phân biệt thật/giả). |
@@ -26,12 +26,15 @@ Trong lĩnh vực Siêu phân giải hình ảnh (Single Image Super-Resolution 
 
 #### A. Super Resolution dựa trên CNN thuần (Plain CNN)
 - **Đại diện tiêu biểu:** SRCNN (ECCV 2014), FSRCNN (ECCV 2016), ESPCN (CVPR 2016).
+- **Phân biệt kiến trúc SRCNN Model Phần mềm và Compact SRCNN Phần cứng RTL:**
+  - **SRCNN Model (Phần mềm Baseline):** Kiến trúc chuẩn `1 -> 64 -> 32 -> 1` với đúng **8.129 tham số** (Conv1: 9×9, 64 bộ lọc = 5.184 w + 64 b; Conv2: 1×1, 32 bộ lọc = 2.048 w + 32 b; Conv3: 5×5, 1 bộ lọc = 800 w + 1 b). Mô hình này sử dụng dữ liệu số thực Float32 trên CPU/GPU, đại diện cho mô hình SRCNN tiêu chuẩn nghiên cứu lý thuyết trong đánh giá 6 mô hình phần mềm.
+  - **Compact SRCNN RTL (Phần cứng FPGA):** Kiến trúc thu gọn `1 -> 16 -> 8 -> 1` với đúng **1.649 tham số** (Conv1: 9×9, 16 bộ lọc = 1.296 w + 16 b; Conv2: 1×1, 8 bộ lọc = 128 w + 8 b; Conv3: 5×5, 1 bộ lọc = 200 w + 1 b). Mô hình được lượng tử hóa số nguyên cố định Fixed-Point S7.0 / S0.7 / S24.7 (Q7 INT8), nạp trực tiếp vào mạch RTL Verilog trên chip FPGA Xilinx Zynq-7020 (bo PYNQ-Z2) nhằm tối ưu triệt để tài nguyên DSP slice, BRAM và LUT, đạt độ trễ thời gian thực và công suất chỉ 1.438 W.
 - **Cơ chế hoạt động:** 
   - Mạng gồm các lớp tích chập tuần tự truyền thống thực hiện 3 công việc: Trích xuất đặc trưng thô (Patch extraction) -> Ánh xạ phi tuyến (Non-linear mapping) -> Tái tạo ảnh phân giải cao (Reconstruction).
   - ESPCN và FSRCNN cải tiến bằng cách trích xuất đặc trưng trực tiếp trên không gian độ phân giải thấp (LR) và chỉ phóng đại ở lớp cuối cùng (Sub-pixel Convolution / PixelShuffle).
 - **Ưu điểm:**
-  - Cấu trúc cực kỳ gọn nhẹ, số lượng trọng số ít (từ hàng chục đến hàng trăm nghìn parameters).
-  - Tốc độ suy luận tính bằng mili-giây, thông lượng đạt từ hàng chục đến hàng trăm FPS (ESPCN đạt >200 FPS).
+  - Cấu trúc cực kỳ gọn nhẹ, số lượng trọng số ít (từ 1.649 tham số ở bản Compact phần cứng đến hàng chục nghìn parameters ở bản gốc).
+  - Tốc độ suy luận tính bằng mili-giây, thông lượng đạt từ hàng chục đến hàng trăm FPS (ESPCN đạt >200 FPS, FPGA Compact SRCNN đạt độ trễ 444 ms cho ảnh 1024x1024).
   - **Là ứng viên số 1 để triển khai cứng hóa lên chip FPGA / phần cứng nhúng** với mức tiêu thụ tài nguyên (LUT, DSP, BRAM) và năng lượng rất thấp.
 - **Hạn chế:**
   - Do không có kết nối tắt (Skip connection), mạng không thể xếp quá sâu vì sẽ gặp hiện tượng triệt tiêu đạo hàm (Vanishing Gradient), làm giới hạn khả năng khôi phục các cấu trúc giải phẫu phức tạp.
@@ -76,9 +79,10 @@ Trong lĩnh vực Siêu phân giải hình ảnh (Single Image Super-Resolution 
 
 Khi so sánh giữa 3 hướng tiếp cận trên 2 bộ dữ liệu y tế của đề tài (sub_NIH và sub_chest), ta rút ra được các kết luận then chốt để đưa vào phân tích trong **Notebook 2**:
 
-1. **Vì sao SRCNN phù hợp cho bài toán cứng hóa phần cứng (FPGA / Bicubic vs. SRCNN):**
-   - So với thuật toán nội suy truyền thống **Bicubic**: SRCNN vượt trội rõ rệt về khả năng tái tạo biên xương, bờ mô mềm và giảm nhiễu.
-   - So với các mạng sâu (EDSR, VDSR): SRCNN có cấu trúc 3 lớp tích chập phẳng, hoàn toàn không cần bộ nhớ đệm phức tạp cho skip connections hay nhánh Generator/Discriminator. Điều này giúp tối ưu hóa việc phân bố tài nguyên logic và DSP trên chip FPGA, bảo đảm xử lý thời gian thực ngay tại thiết bị chụp.
+1. **Vì sao SRCNN phù hợp cho bài toán cứng hóa phần cứng (FPGA / Bicubic vs. Compact SRCNN RTL):**
+   - **Tối ưu hóa kiến trúc thu gọn:** Để triển khai lên chip FPGA Xilinx Zynq-7020 với tài nguyên phần cứng hữu hạn, mô hình SRCNN phần mềm chuẩn (1 -> 64 -> 32 -> 1, 8.129 tham số) đã được tinh gọn thành kiến trúc **Compact SRCNN (1 -> 16 -> 8 -> 1, đúng 1.649 tham số)** kết hợp lượng tử hóa số nguyên cố định Fixed-Point Q7 INT8 (S7.0 / S0.7 / S24.7).
+   - So với thuật toán nội suy truyền thống **Bicubic**: Compact SRCNN RTL vượt trội rõ rệt về khả năng tái tạo biên xương, bờ mô mềm và giảm nhiễu.
+   - So với các mạng sâu (EDSR, VDSR): Compact SRCNN có cấu trúc 3 lớp tích chập phẳng, hoàn toàn không cần bộ nhớ đệm phức tạp cho skip connections hay nhánh Generator/Discriminator. Điều này giúp tối ưu hóa việc phân bố tài nguyên logic và DSP trên chip FPGA, bảo đảm xử lý thời gian thực ngay tại thiết bị chụp với mức công suất chỉ 1.438 W.
    - Hoàn toàn không tạo ra chi tiết giả mạo, bảo toàn an toàn cho phim chụp.
 
 2. **Vì sao SRGAN có điểm định lượng (PSNR/SSIM) kém hơn nhưng vẫn được đưa vào so sánh:**

@@ -1,7 +1,7 @@
 # BẢNG LỘ TRÌNH THỰC HIỆN CÁC NHIỆM VỤ (TASK ROADMAP)
 
 **Dự án:** Siêu phân giải ảnh y tế (AI-Based Medical Image Super-Resolution)  
-**Kiến trúc:** Compact SRCNN (1 -> 16 -> 8 -> 1) trên Xilinx Zynq-7020 (PYNQ-Z2)  
+**Kiến trúc:** Compact SRCNN phần cứng RTL (1 -> 16 -> 8 -> 1, 1.649 tham số) trên Xilinx Zynq-7020 (PYNQ-Z2) & SRCNN Model phần mềm baseline (1 -> 64 -> 32 -> 1, 8.129 tham số)  
 **Căn cứ:** [Request1.txt](file:///Users/giabao/Desktop/GitHub/AI-Based-Image-Super-Resolution/requirements/Request1.txt) (Thành viên 1: AI Modeling & Baseline) và [Request2.txt](file:///Users/giabao/Desktop/GitHub/AI-Based-Image-Super-Resolution/requirements/Request2.txt) (Thành viên 2: Bit-Accurate DV & Benchmark)
 
 ---
@@ -11,8 +11,8 @@
 | Thứ tự | Giai đoạn | Nội dung trọng tâm | Phụ trách | Sản phẩm chính | Trạng thái |
 | :---: | :--- | :--- | :---: | :--- | :---: |
 | **P1** | **Chuẩn bị Dữ liệu & Suy thoái vật lý** | Xây dựng pipeline suy thoái mô phỏng quang học Gaussian + nhiễu Poisson-Gaussian cảm biến y tế; xuất tập test cặp ảnh LR-HR. | Chung / TV1 | Script `generate_degraded_dataset.py`, Thư mục tập test ảnh y tế (`data/degraded_testset/`) | [HOÀN THÀNH] |
-| **P2** | **AI Modeling & Float32 Baseline** | Xây dựng hàm Loss hỗn hợp (MSE + 0.1 × Sobel); Huấn luyện mô hình Compact SRCNN (1.649 params); Đo đạc đối chứng 3 mức. | TV1 | Checkpoints Float32, Đồ thị Loss 300 DPI, Bảng số liệu đối chứng đa bảng Excel | [HOÀN THÀNH] |
-| **P3** | **Bit-Accurate DV & Golden Model** | Xây dựng Golden Model Python mô phỏng 100% số học phần cứng RTL (S7.0, S0.7, S24.7); Scoreboard kiểm tra sai số |I_FPGA - I_Golden| == 0 trên 100% pixel. | TV2 | `golden_model.py`, Script `dv_scoreboard_check.py`, Báo cáo `dv_scoreboard_report.json` | [HOÀN THÀNH] |
+| **P2** | **AI Modeling & Float32 Baseline** | Xây dựng hàm Loss hỗn hợp (MSE + 0.1 × Sobel); Huấn luyện mô hình SRCNN Model (1-64-32-1, 8.129 params) và Compact SRCNN phần cứng (1-16-8-1, 1.649 params); Đo đạc đối chứng 3 mức. | TV1 | Checkpoints Float32, Đồ thị Loss 300 DPI, Bảng số liệu đối chứng đa bảng Excel | [HOÀN THÀNH] |
+| **P3** | **Bit-Accurate DV & Golden Model** | Xây dựng Golden Model Python mô phỏng 100% số học phần cứng RTL của Compact SRCNN (1-16-8-1, 1.649 params, S7.0, S0.7, S24.7); Scoreboard kiểm tra sai số |I_FPGA - I_Golden| == 0 trên 100% pixel. | TV2 | `golden_model.py`, Script `dv_scoreboard_check.py`, Báo cáo `dv_scoreboard_report.json` | [HOÀN THÀNH] |
 | **P4** | **Phân tích PYNQ-Z2 & Benchmark Đa nền tảng** | Phân tích JSON 2.100 ảnh từ PYNQ-Z2 (Mean, Std, Gain, % Gain > 0); Vẽ Histogram (300 DPI); Đo latency/power CPU vs GPU vs FPGA. | TV2 | Script `analyze_kaggle_benchmark.py`, Biểu đồ Histogram (300 DPI), Bảng so sánh đa nền tảng | [CHƯA THỰC HIỆN] |
 | **P5** | **Hình ảnh Trực quan & Đóng gói Bàn giao** | Cắt 5 ảnh mẫu ROI 128x128 zoom 4x; Vẽ Residual Error Heatmap (|I_SR - I_HR|); Tổng hợp toàn bộ số liệu ra file Excel chuẩn. | TV2 | File Excel tổng hợp, Thư mục hình ảnh chuẩn DPI 300 | [CHƯA THỰC HIỆN] |
 
