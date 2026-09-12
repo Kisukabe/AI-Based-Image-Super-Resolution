@@ -7,8 +7,8 @@ Dự án: Siêu phân giải ảnh y tế AI-Based Image Super-Resolution
 Mục đích:
   Sinh 6 biểu đồ so sánh hiệu năng của Bicubic Baseline cùng đầy đủ các mô hình:
     1. Bicubic (Baseline không tham số)
-    2. Compact SRCNN RTL (1-16-8-1, 1.649 tham số, Fixed-Point Q7) — [Đã infer 2.200 ảnh trên GPU]
-    3. SRCNN Original (1-64-32-1, 8.129 tham số, Float32) — [Đã infer 2.200 ảnh trên GPU]
+    2. Compact SRCNN RTL (1-16-8-1, 1.649 tham số, Fixed-Point Q7) - [Đã infer 2.200 ảnh trên GPU]
+    3. SRCNN Original (1-64-32-1, 8.129 tham số, Float32) - [Đã infer 2.200 ảnh trên GPU]
     4. ESPCN (PixelShuffle)
     5. FSRCNN (Fast SRCNN)
     6. VDSR (20 layers Residual)
@@ -72,7 +72,7 @@ PENDING_MODELS = set()  # Đã nạp đầy đủ số liệu 2.200 ảnh cho t�
 def fmt_val(metric: str, v) -> str:
     """Định dạng giá trị chỉ số kèm đơn vị vật lý."""
     if v is None:
-        return '—'
+        return 'N/A'
     try:
         f = float(v)
         if metric == 'PSNR':
@@ -388,7 +388,6 @@ def create_software_cover_page() -> plt.Figure:
         va="top",
         fontsize=8.3,
         color="#1a3a5c",
-        fontweight="bold",
         fontfamily="DejaVu Sans",
     )
     fig.text(
@@ -399,7 +398,6 @@ def create_software_cover_page() -> plt.Figure:
         va="top",
         fontsize=8.3,
         color="#1a3a5c",
-        fontweight="bold",
         fontfamily="DejaVu Sans",
     )
     fig.text(
@@ -467,11 +465,11 @@ def create_software_cover_page() -> plt.Figure:
     )
 
     toc_items = [
-        ("sec", "I. TẬP DỮ LIỆU SUB_NIH (NIH ChestX-ray14 — 1.750 ảnh y tế)", None, 0.620),
+        ("sec", "I. TẬP DỮ LIỆU SUB_NIH (NIH ChestX-ray14 - 1.750 ảnh y tế)", None, 0.620),
         ("item", "     • Tỉ lệ phóng đại: Scale 2x", 2, 0.584),
         ("item", "     • Tỉ lệ phóng đại: Scale 3x", 3, 0.548),
         ("item", "     • Tỉ lệ phóng đại: Scale 4x", 4, 0.512),
-        ("sec", "II. TẬP DỮ LIỆU SUB_CHEST (Chest X-ray Clinical — 450 ảnh lâm sàng)", None, 0.460),
+        ("sec", "II. TẬP DỮ LIỆU SUB_CHEST (Chest X-ray Clinical - 450 ảnh lâm sàng)", None, 0.460),
         ("item", "     • Tỉ lệ phóng đại: Scale 2x", 5, 0.424),
         ("item", "     • Tỉ lệ phóng đại: Scale 3x", 6, 0.388),
         ("item", "     • Tỉ lệ phóng đại: Scale 4x", 7, 0.352),

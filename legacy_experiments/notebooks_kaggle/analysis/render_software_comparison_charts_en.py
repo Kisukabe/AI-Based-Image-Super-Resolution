@@ -381,7 +381,6 @@ def create_software_cover_page_en() -> plt.Figure:
         va="top",
         fontsize=8.3,
         color="#1a3a5c",
-        fontweight="bold",
         fontfamily="DejaVu Sans",
     )
     fig.text(
@@ -392,7 +391,6 @@ def create_software_cover_page_en() -> plt.Figure:
         va="top",
         fontsize=8.3,
         color="#1a3a5c",
-        fontweight="bold",
         fontfamily="DejaVu Sans",
     )
     fig.text(
