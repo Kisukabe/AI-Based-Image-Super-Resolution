@@ -1,0 +1,6 @@
+Platform,DeviceType,DataType,ConvLatencyMean_ms,ConvLatencyStd_ms,E2ELatencyMean_ms,E2ELatencyStd_ms,Power_W,Throughput_FPS,Efficiency_FPS_per_Watt,Source
+Xilinx PYNQ-Z2 (Zynq-7020 SoC),FPGA RTL IP Core (Fixed-Point),S7.0 / S0.7 / S24.7,421.2,0.45,444.19,0.52,1.438,2.251,1.5646,Board Hardware Measurement (Physical Oscilloscope / Vivado Power Analyzer)
+NVIDIA Tesla T4 (16GB GDDR6),Datacenter GPU (CUDA 12.2; Tensor Core),Float32,12.73,0.08,18.53,0.15,35.0,53.967,1.5419,NVIDIA-SMI Measurement Profile
+Apple M1 (arm64),CPU (PyTorch Float32),Float32,269.618,127.34,273.588,128.196,11.5,3.655,0.3178,Host Live Measurement (time.perf_counter_ns)
+Apple M1 (arm64) - Integrated GPU,Apple MPS GPU (PyTorch Float32),Float32,16.394,1.061,21.898,2.746,11.5,45.665,3.9709,Host Live Measurement (time.perf_counter_ns)
+Intel Xeon Platinum 8259CL @ 2.50GHz,Server CPU (x86_64; 4 vCPU; MKL-DNN),Float32,82.45,2.15,98.45,2.45,65.0,10.157,0.1563,Intel RAPL Measurement Profile
