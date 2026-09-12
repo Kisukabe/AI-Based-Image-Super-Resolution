@@ -1,0 +1,516 @@
+#!/usr/bin/env python3
+"""
+================================================================================
+Render Software Comparison Charts & PDF Report
+Dự án: Siêu phân giải ảnh y tế AI-Based Image Super-Resolution
+================================================================================
+Mục đích:
+  Sinh 6 biểu đồ so sánh hiệu năng của Bicubic Baseline cùng 6 mô hình phần mềm:
+  SRCNN (1-64-32-1, 8.129 tham số - đang infer), ESPCN, FSRCNN, VDSR, EDSR, SRGAN
+  qua 3 tỉ lệ phóng đại (Scale 2x, 3x, 4x) trên 2 tập dữ liệu y tế:
+    - Tập dữ liệu sub_NIH (1.750 ảnh)
+    - Tập dữ liệu sub_chest (450 ảnh)
+  Xuất báo cáo PDF hoàn chỉnh gồm Trang bìa, Mục lục và Bookmark điều hướng tương tác.
+================================================================================
+"""
+
+from pathlib import Path
+import json
+import numpy as np
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+from matplotlib.backends.backend_pdf import PdfPages
+import matplotlib.image as mpimg
+import pymupdf
+
+CURRENT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = CURRENT_DIR.parent.parent.parent
+BASE = PROJECT_ROOT / "legacy_experiments/benchmark_results"
+OUT_DIR = CURRENT_DIR / "output"
+OUT_DIR.mkdir(parents=True, exist_ok=True)
+
+# ── Bảng màu và Định dạng chuẩn báo cáo khoa học ─────────────────────────────
+HEADER_BG   = '#1a3a5c'
+HEADER_FG   = '#ffffff'
+ROW_ODD     = '#eaf1fb'
+ROW_EVEN    = '#ffffff'
+PENDING_BG  = '#fff9e6'
+PENDING_FG  = '#b07700'
+EDGE_COLOR  = '#c8d4e3'
+PAGE_BG     = '#f5f8fc'
+TITLE_COLOR = '#1a3a5c'
+SUB_COLOR   = '#555555'
+
+METRICS = ['PSNR', 'SSIM', 'MS_SSIM', 'LPIPS', 'NIQE', 'EPI', 'MSE', 'RMSE', 'Latency', 'FPS']
+METRIC_LABELS = [
+    'PSNR (dB) ↑', 'SSIM ↑', 'MS-SSIM ↑', 'LPIPS ↓',
+    'NIQE ↓', 'EPI ↑', 'MSE ↓', 'RMSE ↓', 'Latency (ms) ↓', 'Tốc độ (FPS) ↑'
+]
+
+MODELS_LIST = ['Bicubic', 'SRCNN', 'ESPCN', 'FSRCNN', 'VDSR', 'EDSR', 'SRGAN']
+PENDING_MODELS = {'SRCNN'}  # SRCNN Model (1-64-32-1) đang chạy suy luận trên Kaggle GPU
+
+
+def fmt_val(metric: str, v) -> str:
+    """Định dạng giá trị chỉ số kèm đơn vị vật lý."""
+    if v is None:
+        return '—'
+    try:
+        f = float(v)
+        if metric == 'PSNR':
+            return f"{f:.4f} dB"
+        elif metric == 'Latency':
+            return f"{f:.2f} ms"
+        elif metric == 'FPS':
+            return f"{f:.1f} FPS"
+        return f"{f:.4f}"
+    except Exception:
+        return str(v)
+
+
+def load_bicubic(scale: int) -> dict:
+    """Nạp kết quả baseline Bicubic cho cả 2 tập dữ liệu."""
+    fn = BASE / f'hardware/bicubic_{scale}x_benchmark.json'
+    if not fn.exists():
+        # Thử đường dẫn thay thế nếu chạy trong cấu trúc khác
+        fn = PROJECT_ROOT / f'results/hardware/bicubic_{scale}x_benchmark.json'
+    with open(fn, 'r', encoding='utf-8') as f:
+        d = json.load(f)
+    out = {}
+    for ds in ['sub_NIH', 'sub_chest']:
+        recs = [r for r in d['per_image_results'] if r.get('dataset') == ds and r.get('status') == 'ok']
+        if not recs:
+            out[ds] = None
+            continue
+        lat = np.mean([r['latency_ms'] for r in recs if r.get('latency_ms') is not None])
+        out[ds] = {
+            'N': len(recs),
+            'PSNR':     round(float(np.mean([r['psnr_bicubic_db'] for r in recs])), 4),
+            'SSIM':     round(float(np.mean([r['ssim_bicubic'] for r in recs])), 4),
+            'MS_SSIM':  round(float(np.mean([r['ms_ssim_bicubic'] for r in recs])), 4),
+            'LPIPS':    round(float(np.mean([r['lpips_bicubic'] for r in recs])), 4),
+            'NIQE':     round(float(np.mean([r['niqe_bicubic'] for r in recs])), 4),
+            'EPI':      round(float(np.mean([r['epi_bicubic'] for r in recs])), 4),
+            'MSE':      round(float(np.mean([r['mse_bicubic'] for r in recs])), 4),
+            'RMSE':     round(float(np.mean([r['rmse_bicubic'] for r in recs])), 4),
+            'Latency':  round(float(lat), 2) if lat > 0 else 0.0,
+            'FPS':      round(1000.0 / float(lat), 1) if lat > 0 else 0.0,
+        }
+    return out
+
+
+def load_software(model: str, scale: int) -> dict:
+    """Nạp kết quả các mô hình phần mềm Deep Learning."""
+    fn = BASE / f'software/{model.upper()}/{model.lower()}_{scale}x_benchmark.json'
+    if not fn.exists():
+        fn = PROJECT_ROOT / f'results/software/{model.upper()}/{model.lower()}_{scale}x_benchmark.json'
+    if not fn.exists():
+        return None
+    with open(fn, 'r', encoding='utf-8') as f:
+        d = json.load(f)
+    out = {}
+    for ds in ['sub_NIH', 'sub_chest']:
+        recs = [r for r in d['per_image_results'] if r.get('dataset') == ds and r.get('status') == 'ok']
+        if not recs:
+            out[ds] = None
+            continue
+        lat = np.mean([r['latency_ms'] for r in recs if r.get('latency_ms') is not None])
+
+        def val(r, *keys):
+            for k in keys:
+                v = r.get(k)
+                if v is not None:
+                    return float(v)
+            return 0.0
+
+        out[ds] = {
+            'N': len(recs),
+            'PSNR':    round(float(np.mean([val(r, 'psnr_model_db', 'psnr_fpga_db') for r in recs])), 4),
+            'SSIM':    round(float(np.mean([val(r, 'ssim_model', 'ssim_fpga') for r in recs])), 4),
+            'MS_SSIM': round(float(np.mean([val(r, 'msssim_fpga', 'msssim_model') for r in recs])), 4),
+            'LPIPS':   round(float(np.mean([val(r, 'lpips_fpga', 'lpips_srgan', 'lpips') for r in recs])), 4),
+            'NIQE':    round(float(np.mean([val(r, 'niqe_fpga', 'niqe_model') for r in recs])), 4),
+            'EPI':     round(float(np.mean([val(r, 'epi') for r in recs])), 4),
+            'MSE':     round(float(np.mean([val(r, 'mse_model', 'mse_fpga') for r in recs])), 4),
+            'RMSE':    round(float(np.mean([val(r, 'rmse_model', 'rmse_fpga') for r in recs])), 4),
+            'Latency': round(float(lat), 2) if lat > 0 else 0.0,
+            'FPS':     round(1000.0 / float(lat), 1) if lat > 0 else 0.0,
+        }
+    return out
+
+
+def build_transposed_table(models: list, model_data_dict: dict, ds: str):
+    """
+    Xây dựng bảng hoán vị 8 cột x 10 hàng:
+      - Cột 0: Tên thông số đánh giá
+      - Cột 1: Bicubic (Baseline)
+      - Cột 2: SRCNN (Đang infer)
+      - Cột 3..7: ESPCN, FSRCNN, VDSR, EDSR, SRGAN
+    """
+    col_labels = ['Thông số']
+    for m in models:
+        if m in PENDING_MODELS:
+            col_labels.append(f"{m}*\n(Đang infer)")
+        else:
+            col_labels.append(m)
+
+    table_rows = []
+    for m_key, m_label in zip(METRICS, METRIC_LABELS):
+        row = [m_label]
+        for m in models:
+            if m in PENDING_MODELS:
+                row.append("Đang infer")
+            else:
+                m_source = model_data_dict.get(m)
+                data = m_source.get(ds) if m_source else None
+                v = data.get(m_key) if data else None
+                row.append(fmt_val(m_key, v))
+        table_rows.append(row)
+    return col_labels, table_rows
+
+
+def render_table(title: str, subtitle: str, col_labels: list, table_rows: list, out_path: Path):
+    """Render bảng số liệu chuẩn xuất bản đồ họa 300 DPI."""
+    models = MODELS_LIST
+    n_cols = len(col_labels)
+    col_w = [0.16] + [0.12] * (n_cols - 1)
+    fig_w = 12.0
+    fig_h = 7.5
+    fig, ax = plt.subplots(figsize=(fig_w, fig_h))
+    fig.patch.set_facecolor(PAGE_BG)
+    ax.set_facecolor(PAGE_BG)
+    ax.axis('off')
+
+    # Title & Subtitle
+    if subtitle:
+        fig.text(0.5, 0.965, title, ha='center', va='top',
+                 fontsize=12.5, fontweight='bold', color=TITLE_COLOR,
+                 fontfamily='DejaVu Sans')
+        fig.text(0.5, 0.925, subtitle, ha='center', va='top',
+                 fontsize=11.0, fontweight='bold', color='#2b6cb0',
+                 fontfamily='DejaVu Sans')
+    else:
+        fig.text(0.5, 0.94, title, ha='center', va='top',
+                 fontsize=13.0, fontweight='bold', color=TITLE_COLOR,
+                 fontfamily='DejaVu Sans')
+
+    def parse_float(v_str):
+        try:
+            return float(v_str.replace('dB', '').replace('ms', '').replace('FPS', '').strip())
+        except Exception:
+            return None
+
+    # Tìm chỉ số tối ưu (best) giữa các mô hình đã hoàn thành infer
+    best_cols_per_row = {}
+    for r_idx, row in enumerate(table_rows, start=1):
+        label = row[0]
+        is_higher = '↑' in label
+        valid_items = []
+        for c_idx, val_str in enumerate(row[1:], start=1):
+            m_name = models[c_idx - 1] if c_idx - 1 < len(models) else ''
+            if m_name in PENDING_MODELS:
+                continue
+            v_num = parse_float(val_str)
+            if v_num is not None:
+                valid_items.append((c_idx, v_num))
+        if valid_items:
+            best_v = max(v for _, v in valid_items) if is_higher else min(v for _, v in valid_items)
+            best_cols_per_row[r_idx] = [c for c, v in valid_items if np.isclose(v, best_v)]
+        else:
+            best_cols_per_row[r_idx] = []
+
+    tbl = ax.table(cellText=table_rows, colLabels=col_labels, colWidths=col_w,
+                   loc='center', cellLoc='center')
+    tbl.auto_set_font_size(False)
+    tbl.set_fontsize(9.5)
+    tbl.scale(1, 1.85)
+
+    for (r, c), cell in tbl.get_celld().items():
+        cell.set_edgecolor(EDGE_COLOR)
+        cell.set_linewidth(0.5)
+        if r == 0:
+            cell.set_facecolor(HEADER_BG)
+            cell.set_text_props(color=HEADER_FG, fontweight='bold', fontsize=9.5)
+        else:
+            if c == 0:
+                cell.set_facecolor('#e2eaf4')
+                cell.set_text_props(fontweight='bold', color='#1a3a5c')
+            else:
+                model_name = models[c - 1] if c - 1 < len(models) else ''
+                if model_name in PENDING_MODELS:
+                    cell.set_facecolor(PENDING_BG)
+                    cell.set_text_props(color=PENDING_FG, fontweight='normal', style='italic')
+                else:
+                    is_best = (c in best_cols_per_row.get(r, []))
+                    if is_best:
+                        cell.set_text_props(fontweight='bold', color='#0f2b48')
+                        cell.set_facecolor('#dce9f8' if r % 2 == 1 else '#eef5fd')
+                    elif r % 2 == 1:
+                        cell.set_facecolor(ROW_ODD)
+                    else:
+                        cell.set_facecolor(ROW_EVEN)
+
+    # Chú thích khoa học tường minh
+    note_text = (
+        "* Ghi chú:  (↑) Giá trị càng cao càng tốt  |  (↓) Giá trị càng thấp càng tốt\n"
+        "   In đậm:  Chỉ số tối ưu nhất giữa các mô hình đã hoàn thành đánh giá\n"
+        "   (*) Cột vàng cam: Mô hình SRCNN (1-64-32-1, 8.129 tham số) đang trong tiến trình infer (Pending) trên Kaggle GPU"
+    )
+    fig.text(0.04, 0.020, note_text, ha='left', va='bottom',
+             fontsize=8.5, color='#444444', style='italic', fontfamily='DejaVu Sans')
+
+    plt.tight_layout(rect=[0, 0.06, 1, 0.90])
+    plt.savefig(out_path, dpi=150, bbox_inches='tight', facecolor=PAGE_BG)
+    plt.close()
+    print(f"  ✓ Đã lưu biểu đồ: {out_path.name}")
+
+
+def create_software_cover_page() -> plt.Figure:
+    """Tạo trang bìa và mục lục cấu trúc báo cáo so sánh phần mềm."""
+    fig, ax = plt.subplots(figsize=(12.0, 8.0))
+    fig.patch.set_facecolor("#f8fafd")
+    ax.set_facecolor("#f8fafd")
+    ax.axis("off")
+
+    # Header title
+    fig.text(
+        0.5,
+        0.955,
+        "BÁO CÁO SO SÁNH HIỆU NĂNG CÁC MÔ HÌNH PHẦN MỀM SIÊU PHÂN GIẢI",
+        ha="center",
+        va="top",
+        fontsize=14.0,
+        fontweight="bold",
+        color="#1a3a5c",
+        fontfamily="DejaVu Sans",
+    )
+    fig.text(
+        0.5,
+        0.920,
+        "Đánh giá đối chứng thực nghiệm: Bicubic Baseline và 6 Mô hình Phần mềm Deep Learning (PyTorch GPU CUDA)",
+        ha="center",
+        va="top",
+        fontsize=10.0,
+        style="italic",
+        color="#2b6cb0",
+        fontfamily="DejaVu Sans",
+    )
+
+    # Architectural Overview Box
+    rect = patches.FancyBboxPatch(
+        (0.08, 0.705),
+        0.84,
+        0.185,
+        boxstyle="round,pad=0.010,rounding_size=0.015",
+        edgecolor="#2b6cb0",
+        facecolor="#eef5fc",
+        linewidth=1.3,
+        transform=fig.transFigure,
+    )
+    fig.patches.append(rect)
+
+    fig.text(
+        0.095,
+        0.875,
+        "DANH MỤC CÁC MÔ HÌNH ĐỐI CHỨNG THỰC NGHIỆM:",
+        ha="left",
+        va="top",
+        fontsize=9.5,
+        fontweight="bold",
+        color="#0f2b48",
+        fontfamily="DejaVu Sans",
+    )
+    fig.text(
+        0.095,
+        0.852,
+        "1. Bicubic (Baseline): Thuật toán nội suy đa thức bậc ba chuẩn hóa (không tham số học).",
+        ha="left",
+        va="top",
+        fontsize=8.5,
+        color="#1a3a5c",
+        fontfamily="DejaVu Sans",
+    )
+    fig.text(
+        0.095,
+        0.830,
+        "2. SRCNN Model: Kiến trúc nguyên bản 1 -> 64 -> 32 -> 1 (8.129 tham số, FP32) — [Đang infer trên Kaggle GPU].",
+        ha="left",
+        va="top",
+        fontsize=8.5,
+        color="#b07700",
+        fontweight="bold",
+        fontfamily="DejaVu Sans",
+    )
+    fig.text(
+        0.095,
+        0.808,
+        "3. ESPCN: Kiến trúc Sub-Pixel Convolution (PixelShuffle) tăng tốc tái tạo ảnh siêu phân giải.",
+        ha="left",
+        va="top",
+        fontsize=8.5,
+        color="#1a3a5c",
+        fontfamily="DejaVu Sans",
+    )
+    fig.text(
+        0.095,
+        0.786,
+        "4. FSRCNN: Mạng SRCNN cải tiến co hẹp số chiều đặc trưng (Shrinking) và mở rộng (Expanding).",
+        ha="left",
+        va="top",
+        fontsize=8.5,
+        color="#1a3a5c",
+        fontfamily="DejaVu Sans",
+    )
+    fig.text(
+        0.095,
+        0.764,
+        "5. VDSR: Mạng rất sâu 20 tầng tích chập học phần dư (Residual Learning) với gradient clipping.",
+        ha="left",
+        va="top",
+        fontsize=8.5,
+        color="#1a3a5c",
+        fontfamily="DejaVu Sans",
+    )
+    fig.text(
+        0.095,
+        0.742,
+        "6. EDSR: Enhanced Deep Residual Networks (8 khối ResBlock, 64 kênh đặc trưng chiều sâu).",
+        ha="left",
+        va="top",
+        fontsize=8.5,
+        color="#1a3a5c",
+        fontfamily="DejaVu Sans",
+    )
+    fig.text(
+        0.095,
+        0.720,
+        "7. SRGAN: Mạng nơ-ron đối kháng tạo sinh tối ưu hóa hàm mất mát thụ cảm trực quan (Perceptual Loss).",
+        ha="left",
+        va="top",
+        fontsize=8.5,
+        color="#1a3a5c",
+        fontfamily="DejaVu Sans",
+    )
+
+    # TOC Header
+    fig.text(
+        0.08,
+        0.675,
+        "CẤU TRÚC NỘI DUNG BÁO CÁO (MỤC LỤC):",
+        ha="left",
+        va="top",
+        fontsize=11.0,
+        fontweight="bold",
+        color="#222222",
+        fontfamily="DejaVu Sans",
+    )
+
+    toc_items = [
+        ("sec", "I. TẬP DỮ LIỆU SUB_NIH (NIH ChestX-ray14 — 1.750 ảnh y tế)", None, 0.635),
+        ("item", "     • Tỉ lệ phóng đại: Scale 2x", 2, 0.598),
+        ("item", "     • Tỉ lệ phóng đại: Scale 3x", 3, 0.562),
+        ("item", "     • Tỉ lệ phóng đại: Scale 4x", 4, 0.526),
+        ("sec", "II. TẬP DỮ LIỆU SUB_CHEST (Chest X-ray Clinical — 450 ảnh lâm sàng)", None, 0.475),
+        ("item", "     • Tỉ lệ phóng đại: Scale 2x", 5, 0.438),
+        ("item", "     • Tỉ lệ phóng đại: Scale 3x", 6, 0.402),
+        ("item", "     • Tỉ lệ phóng đại: Scale 4x", 7, 0.366),
+    ]
+
+    for itype, text, page, y in toc_items:
+        if itype == "sec":
+            fig.text(0.08, y, text, ha="left", va="center", fontsize=9.8, fontweight="bold", color="#1a3a5c", fontfamily="DejaVu Sans")
+        else:
+            fig.text(0.11, y, text, ha="left", va="center", fontsize=9.0, color="#333333", fontfamily="DejaVu Sans")
+            fig.lines.append(
+                plt.Line2D([0.52, 0.85], [y, y], transform=fig.transFigure, color="#bbbbbb", linestyle=":", linewidth=1.0)
+            )
+            fig.text(0.89, y, f"Trang {page}", ha="right", va="center", fontsize=9.0, fontweight="bold", color="#1a3a5c", fontfamily="DejaVu Sans")
+
+    fig.text(
+        0.5,
+        0.035,
+        "AI-Based Image Super-Resolution for Medical Imaging | Benchmarking Suite",
+        ha="center",
+        va="bottom",
+        fontsize=8.5,
+        style="italic",
+        color="#777777",
+        fontfamily="DejaVu Sans",
+    )
+    return fig
+
+
+def generate_all_software_charts_and_pdf():
+    """Thực thi sinh 6 biểu đồ số liệu và kết xuất file PDF hoàn chỉnh."""
+    print("Bắt đầu sinh 6 biểu đồ so sánh phần mềm (SRCNN Model: Đang infer)...")
+
+    # 1. Sinh 6 file PNG cho sub_NIH và sub_chest
+    datasets = [
+        ('sub_NIH', 'I. TẬP DỮ LIỆU SUB_NIH'),
+        ('sub_chest', 'II. TẬP DỮ LIỆU SUB_CHEST'),
+    ]
+
+    charts = []
+    for ds_key, ds_title in datasets:
+        for s_idx, scale in enumerate([2, 3, 4], 1):
+            model_data = {
+                'Bicubic': load_bicubic(scale),
+                'SRCNN':  None,  # Đang infer trên Kaggle GPU
+                'ESPCN':  load_software('ESPCN',  scale),
+                'FSRCNN': load_software('FSRCNN', scale),
+                'VDSR':   load_software('VDSR',   scale),
+                'EDSR':   load_software('EDSR',   scale),
+                'SRGAN':  load_software('SRGAN',  scale),
+            }
+            col_labels, rows = build_transposed_table(MODELS_LIST, model_data, ds_key)
+            title = ds_title
+            subtitle = f"{s_idx}. Tỉ lệ phóng đại: Scale {scale}x"
+            out_png = OUT_DIR / f"nb1_{ds_key}_scale{scale}x.png"
+            render_table(title, subtitle, col_labels, rows, out_png)
+            charts.append(out_png)
+
+    # 2. Xuất file PDF hoàn chỉnh
+    pdf_path_6m = OUT_DIR / "so_sanh_hieu_nang_6_model.pdf"
+    pdf_path_merged = OUT_DIR / "so_sanh_hieu_nang_tong_hop.pdf"
+
+    for target_pdf in [pdf_path_6m, pdf_path_merged]:
+        with PdfPages(str(target_pdf)) as pdf:
+            cover_fig = create_software_cover_page()
+            pdf.savefig(cover_fig, bbox_inches="tight", dpi=140)
+            plt.close(cover_fig)
+
+            for p in charts:
+                img = mpimg.imread(str(p))
+                fig, ax = plt.subplots(figsize=(12.0, img.shape[0] / img.shape[1] * 12.0))
+                ax.imshow(img)
+                ax.axis("off")
+                pdf.savefig(fig, bbox_inches="tight", dpi=140)
+                plt.close(fig)
+
+        # Gắn Bookmarks điều hướng tương tác
+        doc = pymupdf.open(str(target_pdf))
+        toc = [
+            [1, "Trang Bìa & Mục Lục", 1],
+            [1, "I. Tập Dữ Liệu sub_NIH", 2],
+            [2, "Scale 2x", 2],
+            [2, "Scale 3x", 3],
+            [2, "Scale 4x", 4],
+            [1, "II. Tập Dữ Liệu sub_chest", 5],
+            [2, "Scale 2x", 5],
+            [2, "Scale 3x", 6],
+            [2, "Scale 4x", 7],
+        ]
+        doc.set_toc(toc)
+        tmp = target_pdf.with_suffix(".tmp.pdf")
+        doc.save(str(tmp))
+        doc.close()
+        tmp.replace(target_pdf)
+        print(f"✓ Đã xuất PDF: {target_pdf.name} ({target_pdf.stat().st_size / 1024 / 1024:.2f} MB)")
+
+    print("Hoàn tất sinh 6 biểu đồ và xuất bản PDF phần mềm thành công.")
+
+
+if __name__ == "__main__":
+    generate_all_software_charts_and_pdf()

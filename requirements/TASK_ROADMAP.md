@@ -58,3 +58,4 @@
 | **D2.3** | Script kiểm thử Bit-Exact DV Scoreboard | [dv_scoreboard_check.py](file:///Users/giabao/Desktop/GitHub/AI-Based-Image-Super-Resolution/core_project/hardware_fpga/dv_verification/dv_scoreboard_check.py), [dv_scoreboard_report.json](file:///Users/giabao/Desktop/GitHub/AI-Based-Image-Super-Resolution/core_project/hardware_fpga/dv_verification/dv_scoreboard_report.json) | Script hoàn chỉnh, báo cáo nghiệm thu 4/4 kịch bản ALL_PASS, Golden Model 100% bit-exact | Không | [ĐÃ CÓ] |
 | **D2.4** | File Excel thống kê & đo đạc đa nền tảng | `hardware_benchmark_statistics.xlsx` | Số liệu đo PYNQ-Z2 (444.19 ms, 1.438 W) | Số liệu benchmark CPU/GPU và kết quả 2.100 ảnh | [CHƯA CÓ] |
 | **D2.5** | Thư mục hình ảnh độ phân giải cao 300 DPI | Thư mục `figures_dpi300/` | Không | Xuất toàn bộ biểu đồ, ROI zoom-in, heatmap 300 DPI | [CHƯA CÓ] |
+
