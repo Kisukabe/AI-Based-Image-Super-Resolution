@@ -200,7 +200,7 @@ def build_transposed_table(models: list, model_data_dict: dict, ds: str):
     """Build standardized 9-column comparison matrix."""
     col_labels = [
         'Metric',
-        'Bicubic',
+        'Bicubic\n(Baseline)',
         'Compact SRCNN\nRTL',
         'SRCNN\nOriginal',
         'ESPCN',
@@ -297,7 +297,7 @@ def render_table(title: str, subtitle: str, col_labels: list, table_rows: list, 
     # Scientific Footnote
     note_text = (
         "* Notes:  (↑) Higher is better  |  (↓) Lower is better  |  Bold: Optimal metric value across benchmarked models\n"
-        "  Architectures: Compact SRCNN RTL (1-16-8-1, 1,649 params, INT8 Q7)  |  SRCNN Original (1-64-32-1, 8,129 params, FP32)"
+        "  Bicubic (Baseline): Standard interpolation baseline  |  Compact SRCNN RTL (1-16-8-1, 1,649 params, INT8 Q7)  |  SRCNN Original (1-64-32-1, 8,129 params, FP32)"
     )
     fig.text(0.04, 0.020, note_text, ha='left', va='bottom',
              fontsize=8.5, color='#444444', style='italic', fontfamily='DejaVu Sans')

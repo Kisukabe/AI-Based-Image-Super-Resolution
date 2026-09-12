@@ -207,7 +207,7 @@ def build_transposed_table(models: list, model_data_dict: dict, ds: str):
     """
     col_labels = [
         'Thông số',
-        'Bicubic',
+        'Bicubic\n(Baseline)',
         'Compact SRCNN\nRTL',
         'SRCNN\nOriginal',
         'ESPCN',
@@ -304,7 +304,7 @@ def render_table(title: str, subtitle: str, col_labels: list, table_rows: list, 
     # Chú thích khoa học tường minh
     note_text = (
         "* Ghi chú:  (↑) Giá trị càng cao càng tốt  |  (↓) Giá trị càng thấp càng tốt  |  In đậm: Chỉ số tối ưu nhất giữa các mô hình\n"
-        "   Đặc tả kiến trúc: Compact SRCNN RTL (1-16-8-1, 1.649 tham số, Q7)  |  SRCNN Original (1-64-32-1, 8.129 tham số, FP32)"
+        "   Bicubic (Baseline): Thuật toán nội suy chuẩn  |  Compact SRCNN RTL (1-16-8-1, 1.649 tham số, Q7)  |  SRCNN Original (1-64-32-1, 8.129 tham số, FP32)"
     )
     fig.text(0.04, 0.020, note_text, ha='left', va='bottom',
              fontsize=8.5, color='#444444', style='italic', fontfamily='DejaVu Sans')
