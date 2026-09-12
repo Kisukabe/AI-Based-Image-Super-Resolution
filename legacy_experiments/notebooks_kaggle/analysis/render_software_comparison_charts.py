@@ -5,12 +5,17 @@ Render Software Comparison Charts & PDF Report
 Dự án: Siêu phân giải ảnh y tế AI-Based Image Super-Resolution
 ================================================================================
 Mục đích:
-  Sinh 6 biểu đồ so sánh hiệu năng của Bicubic Baseline cùng 6 mô hình phần mềm:
-  SRCNN (1-64-32-1, 8.129 tham số - đang infer), ESPCN, FSRCNN, VDSR, EDSR, SRGAN
-  qua 3 tỉ lệ phóng đại (Scale 2x, 3x, 4x) trên 2 tập dữ liệu y tế:
-    - Tập dữ liệu sub_NIH (1.750 ảnh)
-    - Tập dữ liệu sub_chest (450 ảnh)
-  Xuất báo cáo PDF hoàn chỉnh gồm Trang bìa, Mục lục và Bookmark điều hướng tương tác.
+  Sinh 6 biểu đồ so sánh hiệu năng của Bicubic Baseline cùng các mô hình:
+    1. Bicubic (Baseline)
+    2. Compact SRCNN RTL (1-16-8-1, 1.649 tham số, Fixed-Point Q7) — [Đang infer trên Kaggle GPU]
+    3. SRCNN Original (1-64-32-1, 8.129 tham số, Float32) — [Đã infer xong, giữ nguyên số liệu]
+    4. ESPCN (PixelShuffle)
+    5. FSRCNN (Fast SRCNN)
+    6. VDSR (20 layers Residual)
+    7. EDSR (Enhanced Deep Residual)
+    8. SRGAN (Perceptual Loss GAN)
+  qua 3 scale (Scale 2x, 3x, 4x) trên 2 tập dữ liệu y tế (sub_NIH và sub_chest).
+  Xuất báo cáo PDF chuẩn hóa gồm Trang bìa, Mục lục và Bookmark điều hướng tương tác.
 ================================================================================
 """
 
@@ -31,7 +36,7 @@ BASE = PROJECT_ROOT / "legacy_experiments/benchmark_results"
 OUT_DIR = CURRENT_DIR / "output"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-# ── Bảng màu và Định dạng chuẩn báo cáo khoa học ─────────────────────────────
+# ── Bảng màu và Định dạng chuẩn xuất bản khoa học ───────────────────────────
 HEADER_BG   = '#1a3a5c'
 HEADER_FG   = '#ffffff'
 ROW_ODD     = '#eaf1fb'
@@ -49,8 +54,19 @@ METRIC_LABELS = [
     'NIQE ↓', 'EPI ↑', 'MSE ↓', 'RMSE ↓', 'Latency (ms) ↓', 'Tốc độ (FPS) ↑'
 ]
 
-MODELS_LIST = ['Bicubic', 'SRCNN', 'ESPCN', 'FSRCNN', 'VDSR', 'EDSR', 'SRGAN']
-PENDING_MODELS = {'SRCNN'}  # SRCNN Model (1-64-32-1) đang chạy suy luận trên Kaggle GPU
+# Danh sách đầy đủ 8 mô hình đối chứng (phân biệt rõ Compact SRCNN RTL và SRCNN Original)
+MODELS_LIST = [
+    'Bicubic',
+    'Compact SRCNN RTL',
+    'SRCNN Original',
+    'ESPCN',
+    'FSRCNN',
+    'VDSR',
+    'EDSR',
+    'SRGAN'
+]
+
+PENDING_MODELS = {'Compact SRCNN RTL'}  # Bản RTL 1-16-8-1 đang chạy suy luận trên Kaggle GPU
 
 
 def fmt_val(metric: str, v) -> str:
@@ -74,7 +90,6 @@ def load_bicubic(scale: int) -> dict:
     """Nạp kết quả baseline Bicubic cho cả 2 tập dữ liệu."""
     fn = BASE / f'hardware/bicubic_{scale}x_benchmark.json'
     if not fn.exists():
-        # Thử đường dẫn thay thế nếu chạy trong cấu trúc khác
         fn = PROJECT_ROOT / f'results/hardware/bicubic_{scale}x_benchmark.json'
     with open(fn, 'r', encoding='utf-8') as f:
         d = json.load(f)
@@ -101,11 +116,11 @@ def load_bicubic(scale: int) -> dict:
     return out
 
 
-def load_software(model: str, scale: int) -> dict:
+def load_software(model_folder: str, scale: int) -> dict:
     """Nạp kết quả các mô hình phần mềm Deep Learning."""
-    fn = BASE / f'software/{model.upper()}/{model.lower()}_{scale}x_benchmark.json'
+    fn = BASE / f'software/{model_folder.upper()}/{model_folder.lower()}_{scale}x_benchmark.json'
     if not fn.exists():
-        fn = PROJECT_ROOT / f'results/software/{model.upper()}/{model.lower()}_{scale}x_benchmark.json'
+        fn = PROJECT_ROOT / f'results/software/{model_folder.upper()}/{model_folder.lower()}_{scale}x_benchmark.json'
     if not fn.exists():
         return None
     with open(fn, 'r', encoding='utf-8') as f:
@@ -143,18 +158,24 @@ def load_software(model: str, scale: int) -> dict:
 
 def build_transposed_table(models: list, model_data_dict: dict, ds: str):
     """
-    Xây dựng bảng hoán vị 8 cột x 10 hàng:
+    Xây dựng bảng hoán vị 9 cột x 10 hàng:
       - Cột 0: Tên thông số đánh giá
       - Cột 1: Bicubic (Baseline)
-      - Cột 2: SRCNN (Đang infer)
-      - Cột 3..7: ESPCN, FSRCNN, VDSR, EDSR, SRGAN
+      - Cột 2: Compact SRCNN RTL (1-16-8-1) [Đang infer]
+      - Cột 3: SRCNN Original (1-64-32-1) [Đã infer]
+      - Cột 4..8: ESPCN, FSRCNN, VDSR, EDSR, SRGAN
     """
-    col_labels = ['Thông số']
-    for m in models:
-        if m in PENDING_MODELS:
-            col_labels.append(f"{m}*\n(Đang infer)")
-        else:
-            col_labels.append(m)
+    col_labels = [
+        'Thông số',
+        'Bicubic\n(Baseline)',
+        'Compact SRCNN*\n(1-16-8-1) [RTL]',
+        'SRCNN Original\n(1-64-32-1)',
+        'ESPCN',
+        'FSRCNN',
+        'VDSR',
+        'EDSR',
+        'SRGAN'
+    ]
 
     table_rows = []
     for m_key, m_label in zip(METRICS, METRIC_LABELS):
@@ -172,12 +193,11 @@ def build_transposed_table(models: list, model_data_dict: dict, ds: str):
 
 
 def render_table(title: str, subtitle: str, col_labels: list, table_rows: list, out_path: Path):
-    """Render bảng số liệu chuẩn xuất bản đồ họa 300 DPI."""
+    """Render bảng số liệu chuẩn xuất bản đồ họa 300 DPI với 9 cột."""
     models = MODELS_LIST
-    n_cols = len(col_labels)
-    col_w = [0.16] + [0.12] * (n_cols - 1)
-    fig_w = 12.0
-    fig_h = 7.5
+    col_w = [0.16] + [0.105] * 8
+    fig_w = 13.0
+    fig_h = 7.8
     fig, ax = plt.subplots(figsize=(fig_w, fig_h))
     fig.patch.set_facecolor(PAGE_BG)
     ax.set_facecolor(PAGE_BG)
@@ -224,15 +244,15 @@ def render_table(title: str, subtitle: str, col_labels: list, table_rows: list, 
     tbl = ax.table(cellText=table_rows, colLabels=col_labels, colWidths=col_w,
                    loc='center', cellLoc='center')
     tbl.auto_set_font_size(False)
-    tbl.set_fontsize(9.5)
-    tbl.scale(1, 1.85)
+    tbl.set_fontsize(8.8)
+    tbl.scale(1, 1.95)
 
     for (r, c), cell in tbl.get_celld().items():
         cell.set_edgecolor(EDGE_COLOR)
         cell.set_linewidth(0.5)
         if r == 0:
             cell.set_facecolor(HEADER_BG)
-            cell.set_text_props(color=HEADER_FG, fontweight='bold', fontsize=9.5)
+            cell.set_text_props(color=HEADER_FG, fontweight='bold', fontsize=8.8)
         else:
             if c == 0:
                 cell.set_facecolor('#e2eaf4')
@@ -256,7 +276,7 @@ def render_table(title: str, subtitle: str, col_labels: list, table_rows: list, 
     note_text = (
         "* Ghi chú:  (↑) Giá trị càng cao càng tốt  |  (↓) Giá trị càng thấp càng tốt\n"
         "   In đậm:  Chỉ số tối ưu nhất giữa các mô hình đã hoàn thành đánh giá\n"
-        "   (*) Cột vàng cam: Mô hình SRCNN (1-64-32-1, 8.129 tham số) đang trong tiến trình infer (Pending) trên Kaggle GPU"
+        "   (*) Cột vàng cam: Compact SRCNN RTL (1-16-8-1, 1.649 tham số, Q7) đang trong tiến trình infer (Pending) trên Kaggle GPU"
     )
     fig.text(0.04, 0.020, note_text, ha='left', va='bottom',
              fontsize=8.5, color='#444444', style='italic', fontfamily='DejaVu Sans')
@@ -268,8 +288,8 @@ def render_table(title: str, subtitle: str, col_labels: list, table_rows: list, 
 
 
 def create_software_cover_page() -> plt.Figure:
-    """Tạo trang bìa và mục lục cấu trúc báo cáo so sánh phần mềm."""
-    fig, ax = plt.subplots(figsize=(12.0, 8.0))
+    """Tạo trang bìa và mục lục cấu trúc báo cáo so sánh các mô hình."""
+    fig, ax = plt.subplots(figsize=(12.0, 8.2))
     fig.patch.set_facecolor("#f8fafd")
     ax.set_facecolor("#f8fafd")
     ax.axis("off")
@@ -277,8 +297,8 @@ def create_software_cover_page() -> plt.Figure:
     # Header title
     fig.text(
         0.5,
-        0.955,
-        "BÁO CÁO SO SÁNH HIỆU NĂNG CÁC MÔ HÌNH PHẦN MỀM SIÊU PHÂN GIẢI",
+        0.960,
+        "BÁO CÁO SO SÁNH HIỆU NĂNG CÁC MÔ HÌNH SIÊU PHÂN GIẢI",
         ha="center",
         va="top",
         fontsize=14.0,
@@ -288,11 +308,11 @@ def create_software_cover_page() -> plt.Figure:
     )
     fig.text(
         0.5,
-        0.920,
-        "Đánh giá đối chứng thực nghiệm: Bicubic Baseline và 6 Mô hình Phần mềm Deep Learning (PyTorch GPU CUDA)",
+        0.925,
+        "Đánh giá đối chứng thực nghiệm: Bicubic Baseline và Các Mô hình Deep Learning (Phân biệt Compact RTL và Original)",
         ha="center",
         va="top",
-        fontsize=10.0,
+        fontsize=9.8,
         style="italic",
         color="#2b6cb0",
         fontfamily="DejaVu Sans",
@@ -300,9 +320,9 @@ def create_software_cover_page() -> plt.Figure:
 
     # Architectural Overview Box
     rect = patches.FancyBboxPatch(
-        (0.08, 0.705),
+        (0.08, 0.690),
         0.84,
-        0.185,
+        0.205,
         boxstyle="round,pad=0.010,rounding_size=0.015",
         edgecolor="#2b6cb0",
         facecolor="#eef5fc",
@@ -313,7 +333,7 @@ def create_software_cover_page() -> plt.Figure:
 
     fig.text(
         0.095,
-        0.875,
+        0.880,
         "DANH MỤC CÁC MÔ HÌNH ĐỐI CHỨNG THỰC NGHIỆM:",
         ha="left",
         va="top",
@@ -324,72 +344,83 @@ def create_software_cover_page() -> plt.Figure:
     )
     fig.text(
         0.095,
-        0.852,
+        0.858,
         "1. Bicubic (Baseline): Thuật toán nội suy đa thức bậc ba chuẩn hóa (không tham số học).",
         ha="left",
         va="top",
-        fontsize=8.5,
+        fontsize=8.3,
         color="#1a3a5c",
         fontfamily="DejaVu Sans",
     )
     fig.text(
         0.095,
-        0.830,
-        "2. SRCNN Model: Kiến trúc nguyên bản 1 -> 64 -> 32 -> 1 (8.129 tham số, FP32) — [Đang infer trên Kaggle GPU].",
+        0.836,
+        "2. Compact SRCNN RTL: Kiến trúc phần cứng thu gọn 1 -> 16 -> 8 -> 1 (1.649 tham số, Q7) — [Đang infer trên Kaggle GPU].",
         ha="left",
         va="top",
-        fontsize=8.5,
+        fontsize=8.3,
         color="#b07700",
         fontweight="bold",
         fontfamily="DejaVu Sans",
     )
     fig.text(
         0.095,
-        0.808,
-        "3. ESPCN: Kiến trúc Sub-Pixel Convolution (PixelShuffle) tăng tốc tái tạo ảnh siêu phân giải.",
+        0.814,
+        "3. SRCNN Original: Kiến trúc phần mềm gốc 1 -> 64 -> 32 -> 1 (8.129 tham số, FP32) — [Đã infer hoàn tất].",
         ha="left",
         va="top",
-        fontsize=8.5,
+        fontsize=8.3,
+        color="#1a3a5c",
+        fontweight="bold",
+        fontfamily="DejaVu Sans",
+    )
+    fig.text(
+        0.095,
+        0.792,
+        "4. ESPCN: Kiến trúc Sub-Pixel Convolution (PixelShuffle) tăng tốc tái tạo ảnh siêu phân giải.",
+        ha="left",
+        va="top",
+        fontsize=8.3,
         color="#1a3a5c",
         fontfamily="DejaVu Sans",
     )
     fig.text(
         0.095,
-        0.786,
-        "4. FSRCNN: Mạng SRCNN cải tiến co hẹp số chiều đặc trưng (Shrinking) và mở rộng (Expanding).",
+        0.770,
+        "5. FSRCNN: Mạng SRCNN cải tiến co hẹp số chiều đặc trưng (Shrinking) và mở rộng (Expanding).",
         ha="left",
         va="top",
-        fontsize=8.5,
+        fontsize=8.3,
         color="#1a3a5c",
         fontfamily="DejaVu Sans",
     )
     fig.text(
         0.095,
-        0.764,
-        "5. VDSR: Mạng rất sâu 20 tầng tích chập học phần dư (Residual Learning) với gradient clipping.",
+        0.748,
+        "6. VDSR: Mạng rất sâu 20 tầng tích chập học phần dư (Residual Learning) với gradient clipping.",
         ha="left",
         va="top",
-        fontsize=8.5,
+        fontsize=8.3,
         color="#1a3a5c",
         fontfamily="DejaVu Sans",
     )
     fig.text(
         0.095,
-        0.742,
-        "6. EDSR: Enhanced Deep Residual Networks (8 khối ResBlock, 64 kênh đặc trưng chiều sâu).",
+        0.726,
+        "7. EDSR: Enhanced Deep Residual Networks (8 khối ResBlock, 64 kênh đặc trưng chiều sâu).",
         ha="left",
         va="top",
-        fontsize=8.5,
+        fontsize=8.3,
         color="#1a3a5c",
         fontfamily="DejaVu Sans",
     )
     fig.text(
         0.095,
-        0.720,
-        "7. SRGAN: Mạng nơ-ron đối kháng tạo sinh tối ưu hóa hàm mất mát thụ cảm trực quan (Perceptual Loss).",
+        0.704,
+        "8. SRGAN: Mạng nơ-ron đối kháng tạo sinh tối ưu hóa hàm mất mát thụ cảm trực quan (Perceptual Loss).",
         ha="left",
         va="top",
-        fontsize=8.5,
+        fontsize=8.3,
         color="#1a3a5c",
         fontfamily="DejaVu Sans",
     )
@@ -397,7 +428,7 @@ def create_software_cover_page() -> plt.Figure:
     # TOC Header
     fig.text(
         0.08,
-        0.675,
+        0.660,
         "CẤU TRÚC NỘI DUNG BÁO CÁO (MỤC LỤC):",
         ha="left",
         va="top",
@@ -408,14 +439,14 @@ def create_software_cover_page() -> plt.Figure:
     )
 
     toc_items = [
-        ("sec", "I. TẬP DỮ LIỆU SUB_NIH (NIH ChestX-ray14 — 1.750 ảnh y tế)", None, 0.635),
-        ("item", "     • Tỉ lệ phóng đại: Scale 2x", 2, 0.598),
-        ("item", "     • Tỉ lệ phóng đại: Scale 3x", 3, 0.562),
-        ("item", "     • Tỉ lệ phóng đại: Scale 4x", 4, 0.526),
-        ("sec", "II. TẬP DỮ LIỆU SUB_CHEST (Chest X-ray Clinical — 450 ảnh lâm sàng)", None, 0.475),
-        ("item", "     • Tỉ lệ phóng đại: Scale 2x", 5, 0.438),
-        ("item", "     • Tỉ lệ phóng đại: Scale 3x", 6, 0.402),
-        ("item", "     • Tỉ lệ phóng đại: Scale 4x", 7, 0.366),
+        ("sec", "I. TẬP DỮ LIỆU SUB_NIH (NIH ChestX-ray14 — 1.750 ảnh y tế)", None, 0.620),
+        ("item", "     • Tỉ lệ phóng đại: Scale 2x", 2, 0.584),
+        ("item", "     • Tỉ lệ phóng đại: Scale 3x", 3, 0.548),
+        ("item", "     • Tỉ lệ phóng đại: Scale 4x", 4, 0.512),
+        ("sec", "II. TẬP DỮ LIỆU SUB_CHEST (Chest X-ray Clinical — 450 ảnh lâm sàng)", None, 0.460),
+        ("item", "     • Tỉ lệ phóng đại: Scale 2x", 5, 0.424),
+        ("item", "     • Tỉ lệ phóng đại: Scale 3x", 6, 0.388),
+        ("item", "     • Tỉ lệ phóng đại: Scale 4x", 7, 0.352),
     ]
 
     for itype, text, page, y in toc_items:
@@ -443,10 +474,9 @@ def create_software_cover_page() -> plt.Figure:
 
 
 def generate_all_software_charts_and_pdf():
-    """Thực thi sinh 6 biểu đồ số liệu và kết xuất file PDF hoàn chỉnh."""
-    print("Bắt đầu sinh 6 biểu đồ so sánh phần mềm (SRCNN Model: Đang infer)...")
+    """Thực thi sinh 6 biểu đồ số liệu 9 cột và kết xuất file PDF hoàn chỉnh."""
+    print("Bắt đầu sinh 6 biểu đồ so sánh phân biệt Compact SRCNN RTL và SRCNN Original...")
 
-    # 1. Sinh 6 file PNG cho sub_NIH và sub_chest
     datasets = [
         ('sub_NIH', 'I. TẬP DỮ LIỆU SUB_NIH'),
         ('sub_chest', 'II. TẬP DỮ LIỆU SUB_CHEST'),
@@ -457,7 +487,8 @@ def generate_all_software_charts_and_pdf():
         for s_idx, scale in enumerate([2, 3, 4], 1):
             model_data = {
                 'Bicubic': load_bicubic(scale),
-                'SRCNN':  None,  # Đang infer trên Kaggle GPU
+                'Compact SRCNN RTL': None,  # Đang infer trên Kaggle GPU
+                'SRCNN Original': load_software('SRCNN', scale),  # Đã có số liệu đầy đủ
                 'ESPCN':  load_software('ESPCN',  scale),
                 'FSRCNN': load_software('FSRCNN', scale),
                 'VDSR':   load_software('VDSR',   scale),
@@ -471,7 +502,7 @@ def generate_all_software_charts_and_pdf():
             render_table(title, subtitle, col_labels, rows, out_png)
             charts.append(out_png)
 
-    # 2. Xuất file PDF hoàn chỉnh
+    # Xuất các bản PDF hoàn chỉnh
     pdf_path_6m = OUT_DIR / "so_sanh_hieu_nang_6_model.pdf"
     pdf_path_merged = OUT_DIR / "so_sanh_hieu_nang_tong_hop.pdf"
 
@@ -483,7 +514,7 @@ def generate_all_software_charts_and_pdf():
 
             for p in charts:
                 img = mpimg.imread(str(p))
-                fig, ax = plt.subplots(figsize=(12.0, img.shape[0] / img.shape[1] * 12.0))
+                fig, ax = plt.subplots(figsize=(13.0, img.shape[0] / img.shape[1] * 13.0))
                 ax.imshow(img)
                 ax.axis("off")
                 pdf.savefig(fig, bbox_inches="tight", dpi=140)
@@ -509,7 +540,7 @@ def generate_all_software_charts_and_pdf():
         tmp.replace(target_pdf)
         print(f"✓ Đã xuất PDF: {target_pdf.name} ({target_pdf.stat().st_size / 1024 / 1024:.2f} MB)")
 
-    print("Hoàn tất sinh 6 biểu đồ và xuất bản PDF phần mềm thành công.")
+    print("Hoàn tất sinh 6 biểu đồ và xuất bản PDF thành công.")
 
 
 if __name__ == "__main__":
