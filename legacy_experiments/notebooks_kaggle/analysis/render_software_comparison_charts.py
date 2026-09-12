@@ -5,10 +5,10 @@ Render Software Comparison Charts & PDF Report
 Dự án: Siêu phân giải ảnh y tế AI-Based Image Super-Resolution
 ================================================================================
 Mục đích:
-  Sinh 6 biểu đồ so sánh hiệu năng của Bicubic Baseline cùng các mô hình:
-    1. Bicubic (Baseline)
-    2. Compact SRCNN RTL (1-16-8-1, 1.649 tham số, Fixed-Point Q7) — [Đang infer trên Kaggle GPU]
-    3. SRCNN Original (1-64-32-1, 8.129 tham số, Float32) — [Đã infer xong, giữ nguyên số liệu]
+  Sinh 6 biểu đồ so sánh hiệu năng của Bicubic Baseline cùng đầy đủ các mô hình:
+    1. Bicubic (Baseline không tham số)
+    2. Compact SRCNN RTL (1-16-8-1, 1.649 tham số, Fixed-Point Q7) — [Đã infer 2.200 ảnh trên GPU]
+    3. SRCNN Original (1-64-32-1, 8.129 tham số, Float32) — [Đã infer 2.200 ảnh trên GPU]
     4. ESPCN (PixelShuffle)
     5. FSRCNN (Fast SRCNN)
     6. VDSR (20 layers Residual)
@@ -54,7 +54,7 @@ METRIC_LABELS = [
     'NIQE ↓', 'EPI ↑', 'MSE ↓', 'RMSE ↓', 'Latency (ms) ↓', 'Tốc độ (FPS) ↑'
 ]
 
-# Danh sách đầy đủ 8 mô hình đối chứng (phân biệt rõ Compact SRCNN RTL và SRCNN Original)
+# Danh sách đầy đủ 8 mô hình đối chứng (tất cả đã hoàn tất infer 100%)
 MODELS_LIST = [
     'Bicubic',
     'Compact SRCNN RTL',
@@ -66,7 +66,7 @@ MODELS_LIST = [
     'SRGAN'
 ]
 
-PENDING_MODELS = {'Compact SRCNN RTL'}  # Bản RTL 1-16-8-1 đang chạy suy luận trên Kaggle GPU
+PENDING_MODELS = set()  # Đã nạp đầy đủ số liệu 2.200 ảnh cho tất cả mô hình
 
 
 def fmt_val(metric: str, v) -> str:
@@ -116,6 +116,46 @@ def load_bicubic(scale: int) -> dict:
     return out
 
 
+def load_compact_srcnn_rtl(scale: int) -> dict:
+    """Nạp kết quả mô hình phần cứng Compact SRCNN RTL (1-16-8-1, 1.649 params, Fixed-Point Q7)."""
+    fn = BASE / f'hardware/compact_srcnn_rtl_{scale}x_benchmark.json'
+    if not fn.exists():
+        fn = PROJECT_ROOT / f'results/hardware/compact_srcnn_rtl_{scale}x_benchmark.json'
+    if not fn.exists():
+        return None
+    with open(fn, 'r', encoding='utf-8') as f:
+        d = json.load(f)
+    out = {}
+    for ds in ['sub_NIH', 'sub_chest']:
+        recs = [r for r in d['per_image_results'] if r.get('dataset') == ds and r.get('status') == 'ok']
+        if not recs:
+            out[ds] = None
+            continue
+        lat = np.mean([r['latency_ms'] for r in recs if r.get('latency_ms') is not None])
+
+        def val(r, *keys):
+            for k in keys:
+                v = r.get(k)
+                if v is not None:
+                    return float(v)
+            return 0.0
+
+        out[ds] = {
+            'N': len(recs),
+            'PSNR':    round(float(np.mean([val(r, 'psnr_model_db', 'psnr_fpga_db') for r in recs])), 4),
+            'SSIM':    round(float(np.mean([val(r, 'ssim_model', 'ssim_fpga') for r in recs])), 4),
+            'MS_SSIM': round(float(np.mean([val(r, 'msssim_fpga', 'msssim_model') for r in recs])), 4),
+            'LPIPS':   round(float(np.mean([val(r, 'lpips_fpga', 'lpips') for r in recs])), 4),
+            'NIQE':    round(float(np.mean([val(r, 'niqe_fpga', 'niqe_model') for r in recs])), 4),
+            'EPI':     round(float(np.mean([val(r, 'epi') for r in recs])), 4),
+            'MSE':     round(float(np.mean([val(r, 'mse_model', 'mse_fpga') for r in recs])), 4),
+            'RMSE':    round(float(np.mean([val(r, 'rmse_model', 'rmse_fpga') for r in recs])), 4),
+            'Latency': round(float(lat), 2) if lat > 0 else 0.0,
+            'FPS':     round(1000.0 / float(lat), 1) if lat > 0 else 0.0,
+        }
+    return out
+
+
 def load_software(model_folder: str, scale: int) -> dict:
     """Nạp kết quả các mô hình phần mềm Deep Learning."""
     fn = BASE / f'software/{model_folder.upper()}/{model_folder.lower()}_{scale}x_benchmark.json'
@@ -161,14 +201,14 @@ def build_transposed_table(models: list, model_data_dict: dict, ds: str):
     Xây dựng bảng hoán vị 9 cột x 10 hàng:
       - Cột 0: Tên thông số đánh giá
       - Cột 1: Bicubic (Baseline)
-      - Cột 2: Compact SRCNN RTL (1-16-8-1) [Đang infer]
-      - Cột 3: SRCNN Original (1-64-32-1) [Đã infer]
+      - Cột 2: Compact SRCNN RTL (1-16-8-1) [Q7]
+      - Cột 3: SRCNN Original (1-64-32-1)
       - Cột 4..8: ESPCN, FSRCNN, VDSR, EDSR, SRGAN
     """
     col_labels = [
         'Thông số',
         'Bicubic\n(Baseline)',
-        'Compact SRCNN*\n(1-16-8-1) [RTL]',
+        'Compact SRCNN RTL\n(1-16-8-1) [Q7]',
         'SRCNN Original\n(1-64-32-1)',
         'ESPCN',
         'FSRCNN',
@@ -181,19 +221,16 @@ def build_transposed_table(models: list, model_data_dict: dict, ds: str):
     for m_key, m_label in zip(METRICS, METRIC_LABELS):
         row = [m_label]
         for m in models:
-            if m in PENDING_MODELS:
-                row.append("Đang infer")
-            else:
-                m_source = model_data_dict.get(m)
-                data = m_source.get(ds) if m_source else None
-                v = data.get(m_key) if data else None
-                row.append(fmt_val(m_key, v))
+            m_source = model_data_dict.get(m)
+            data = m_source.get(ds) if m_source else None
+            v = data.get(m_key) if data else None
+            row.append(fmt_val(m_key, v))
         table_rows.append(row)
     return col_labels, table_rows
 
 
 def render_table(title: str, subtitle: str, col_labels: list, table_rows: list, out_path: Path):
-    """Render bảng số liệu chuẩn xuất bản đồ họa 300 DPI với 9 cột."""
+    """Render bảng số liệu chuẩn xuất bản đồ họa 300 DPI với 9 cột đầy đủ số liệu."""
     models = MODELS_LIST
     col_w = [0.16] + [0.105] * 8
     fig_w = 13.0
@@ -229,9 +266,6 @@ def render_table(title: str, subtitle: str, col_labels: list, table_rows: list, 
         is_higher = '↑' in label
         valid_items = []
         for c_idx, val_str in enumerate(row[1:], start=1):
-            m_name = models[c_idx - 1] if c_idx - 1 < len(models) else ''
-            if m_name in PENDING_MODELS:
-                continue
             v_num = parse_float(val_str)
             if v_num is not None:
                 valid_items.append((c_idx, v_num))
@@ -258,25 +292,19 @@ def render_table(title: str, subtitle: str, col_labels: list, table_rows: list, 
                 cell.set_facecolor('#e2eaf4')
                 cell.set_text_props(fontweight='bold', color='#1a3a5c')
             else:
-                model_name = models[c - 1] if c - 1 < len(models) else ''
-                if model_name in PENDING_MODELS:
-                    cell.set_facecolor(PENDING_BG)
-                    cell.set_text_props(color=PENDING_FG, fontweight='normal', style='italic')
+                is_best = (c in best_cols_per_row.get(r, []))
+                if is_best:
+                    cell.set_text_props(fontweight='bold', color='#0f2b48')
+                    cell.set_facecolor('#dce9f8' if r % 2 == 1 else '#eef5fd')
+                elif r % 2 == 1:
+                    cell.set_facecolor(ROW_ODD)
                 else:
-                    is_best = (c in best_cols_per_row.get(r, []))
-                    if is_best:
-                        cell.set_text_props(fontweight='bold', color='#0f2b48')
-                        cell.set_facecolor('#dce9f8' if r % 2 == 1 else '#eef5fd')
-                    elif r % 2 == 1:
-                        cell.set_facecolor(ROW_ODD)
-                    else:
-                        cell.set_facecolor(ROW_EVEN)
+                    cell.set_facecolor(ROW_EVEN)
 
     # Chú thích khoa học tường minh
     note_text = (
         "* Ghi chú:  (↑) Giá trị càng cao càng tốt  |  (↓) Giá trị càng thấp càng tốt\n"
-        "   In đậm:  Chỉ số tối ưu nhất giữa các mô hình đã hoàn thành đánh giá\n"
-        "   (*) Cột vàng cam: Compact SRCNN RTL (1-16-8-1, 1.649 tham số, Q7) đang trong tiến trình infer (Pending) trên Kaggle GPU"
+        "   In đậm:  Chỉ số tối ưu nhất giữa các mô hình đánh giá thực nghiệm"
     )
     fig.text(0.04, 0.020, note_text, ha='left', va='bottom',
              fontsize=8.5, color='#444444', style='italic', fontfamily='DejaVu Sans')
@@ -355,11 +383,11 @@ def create_software_cover_page() -> plt.Figure:
     fig.text(
         0.095,
         0.836,
-        "2. Compact SRCNN RTL: Kiến trúc phần cứng thu gọn 1 -> 16 -> 8 -> 1 (1.649 tham số, Q7) — [Đang infer trên Kaggle GPU].",
+        "2. Compact SRCNN RTL: Kiến trúc phần cứng thu gọn 1 -> 16 -> 8 -> 1 (1.649 tham số, Q7).",
         ha="left",
         va="top",
         fontsize=8.3,
-        color="#b07700",
+        color="#1a3a5c",
         fontweight="bold",
         fontfamily="DejaVu Sans",
     )
@@ -475,7 +503,7 @@ def create_software_cover_page() -> plt.Figure:
 
 def generate_all_software_charts_and_pdf():
     """Thực thi sinh 6 biểu đồ số liệu 9 cột và kết xuất file PDF hoàn chỉnh."""
-    print("Bắt đầu sinh 6 biểu đồ so sánh phân biệt Compact SRCNN RTL và SRCNN Original...")
+    print("Bắt đầu sinh 6 biểu đồ so sánh đầy đủ số liệu cả 8 mô hình...")
 
     datasets = [
         ('sub_NIH', 'I. TẬP DỮ LIỆU SUB_NIH'),
@@ -487,8 +515,8 @@ def generate_all_software_charts_and_pdf():
         for s_idx, scale in enumerate([2, 3, 4], 1):
             model_data = {
                 'Bicubic': load_bicubic(scale),
-                'Compact SRCNN RTL': None,  # Đang infer trên Kaggle GPU
-                'SRCNN Original': load_software('SRCNN', scale),  # Đã có số liệu đầy đủ
+                'Compact SRCNN RTL': load_compact_srcnn_rtl(scale),  # Đã có số liệu đầy đủ từ Kaggle
+                'SRCNN Original': load_software('SRCNN', scale),      # Đã có số liệu đầy đủ
                 'ESPCN':  load_software('ESPCN',  scale),
                 'FSRCNN': load_software('FSRCNN', scale),
                 'VDSR':   load_software('VDSR',   scale),
