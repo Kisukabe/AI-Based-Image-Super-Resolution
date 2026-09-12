@@ -281,18 +281,15 @@ def render_table(title: str, subtitle: str, col_labels: list, table_rows: list, 
             cell.set_facecolor(HEADER_BG)
             cell.set_text_props(color=HEADER_FG, fontweight='bold', fontsize=8.8)
         else:
+            cell.set_facecolor('#ffffff')
             if c == 0:
-                cell.set_facecolor('#e2eaf4')
                 cell.set_text_props(fontweight='bold', color='#1a3a5c')
             else:
                 is_best = (c in best_cols_per_row.get(r, []))
                 if is_best:
-                    cell.set_text_props(fontweight='bold', color='#0f2b48')
-                    cell.set_facecolor('#dce9f8' if r % 2 == 1 else '#eef5fd')
-                elif r % 2 == 1:
-                    cell.set_facecolor(ROW_ODD)
+                    cell.set_text_props(fontweight='bold', color='#0a2540')
                 else:
-                    cell.set_facecolor(ROW_EVEN)
+                    cell.set_text_props(fontweight='normal', color='#222222')
 
     # Scientific Footnote
     note_text = (
@@ -330,7 +327,7 @@ def create_software_cover_page_en() -> plt.Figure:
     fig.text(
         0.5,
         0.925,
-        "Empirical Benchmark: Bicubic Baseline vs. Deep Learning Models (Compact RTL & Software Architectures)",
+        "Empirical Benchmark: Bicubic Baseline vs. Deep Learning Models",
         ha="center",
         va="top",
         fontsize=9.8,
