@@ -4,9 +4,10 @@
 Generator: Kaggle Benchmark Notebook for Compact SRCNN RTL (1-16-8-1, 1,649 params)
 ================================================================================
 Mục đích:
-  Tạo file Jupyter Notebook (.ipynb) hoàn chỉnh, self-contained và tối ưu hóa
-  để chạy suy luận (inference) trọn bộ 2.200 ảnh y tế (duc24kdl/sub-x-ray)
-  trên GPU Kaggle cho cả 3 tỉ lệ Scale 2x, 3x, 4x.
+  Tạo file Jupyter Notebook (.ipynb) chuẩn 13 cell (1 Markdown Header + 12 Code Cells)
+  khớp 100% về kiến trúc, luồng thực thi, biến số và cấu trúc thư mục với
+  notebook chuẩn kaggle_espcn_benchmark.ipynb, chỉ khác duy nhất ở mô hình sử dụng:
+  Compact SRCNN RTL (1 -> 16 -> 8 -> 1, 1.649 tham số, Bit-Accurate Fixed Point).
 ================================================================================
 """
 
@@ -14,7 +15,6 @@ import json
 import os
 from pathlib import Path
 
-# Đọc weights và biases thực tế đã nạp trên phần cứng PYNQ-Z2
 REPO_ROOT = Path(__file__).resolve().parent
 WEIGHTS_FILE = REPO_ROOT / "core_project/hardware_fpga/weights_fixed_point/weights_hex_clean.txt"
 BIASES_FILE = REPO_ROOT / "core_project/hardware_fpga/weights_fixed_point/biases_hex_clean.txt"
@@ -48,47 +48,45 @@ def add_code(source):
     })
 
 # ------------------------------------------------------------------------------
-# CELL 0: Markdown Header
+# CELL 0: Markdown Header (Tương ứng Header của kaggle_espcn_benchmark.ipynb)
 # ------------------------------------------------------------------------------
-add_md("""# 🔬 COMPACT SRCNN RTL (1-16-8-1, 1.649 PARAMS) — MULTI-SCALE BENCHMARK PIPELINE
-### Đánh Giá Suy Luận Phần Cứng RTL Bit-Accurate Trên Tập Dữ Liệu Y Tế (Scale 2×, 3×, 4×)
-* **Kiến trúc cốt lõi**: Compact SRCNN RTL (1 $\\rightarrow$ 16 $\\rightarrow$ 8 $\\rightarrow$ 1), đúng **1.649 tham số** (1.624 trọng số + 25 bias).
-* **Số học phần cứng**: Bit-Accurate Fixed-Point số nguyên (S7.0 pixel, S0.7 trọng số, S24.7 tích lũy, dịch bit `acc >> 7`, offset 128).
-* **Tập dữ liệu**: `duc24kdl/sub-x-ray` (2.200 ảnh y tế: 1.750 ảnh `sub_NIH` + 450 ảnh `sub_chest`).
-* **Thang đo**: Tuần tự qua cả 3 tỉ lệ phóng đại **2× $\\rightarrow$ 3× $\\rightarrow$ 4×**.
-* **Độ phân giải**: Giữ nguyên độ phân giải gốc của ảnh (căn chỉnh kích thước chia hết cho từng tỉ lệ scale).
-* **Bộ chỉ số**: 38 trường dữ liệu khoa học chuẩn mực (PSNR, SSIM, MS-SSIM, LPIPS, NIQE, EPI, Latency, FPS, Gains).
+add_md("""# 🔬 Compact SRCNN RTL Benchmark Pipeline: Scale 2×, 3×, 4× trên Ảnh Y Tế
+### Mô hình: Compact SRCNN RTL (1 -> 16 -> 8 -> 1, 1.649 tham số)
+* **Tác giả / Kiến trúc**: Compact SRCNN RTL triển khai phần cứng Xilinx Zynq-7020 (PYNQ-Z2)
+* **Mô tả**: Mô hình 3 tầng tích chập Compact RTL số học Fixed-Point bit-accurate (S7.0, S0.7, S24.7).
+* **Tập dữ liệu**: `duc24kdl/sub-x-ray` (2.200 ảnh: 1.750 ảnh `sub_NIH` + 450 ảnh `sub_chest`)
+* **Tỉ lệ đánh giá**: Tuần tự qua cả 3 tỉ lệ **2× $\\rightarrow$ 3× $\\rightarrow$ 4×**
+* **Độ phân giải**: Giữ nguyên độ phân giải gốc của ảnh (căn chỉnh chia hết cho từng tỉ lệ scale)
 
 ---
 
 | Cell | Nhiệm vụ thực thi |
 | :--- | :--- |
-| **Cell 1** | Cài đặt thư viện (`lpips`, `pytorch-msssim`, `pyiqa`) & Nhúng sẵn trọng số RTL Trained (100% self-contained) |
-| **Cell 2** | Khởi tạo GPU CUDA & Bộ hàm đo lường metric chuẩn khoa học chạy trực tiếp trên Tensor |
-| **Cell 3** | Định nghĩa kiến trúc **Compact SRCNN RTL Bit-Accurate (1-16-8-1)** & Bộ nạp trọng số |
-| **Cell 4** | Smoke Test kiểm tra shape đầu ra và tính Bit-Exact tuyệt đối cho cả 3 Scale (2×, 3×, 4×) |
-| **Cell 5** | Quét tập dữ liệu ảnh y tế `duc24kdl/sub-x-ray` (1.750 NIH + 450 Chest) |
-| **Cell 6** | Cấu hình tham số đánh giá (`SCALES_TO_RUN = [2, 3, 4]`, `MAX_IMAGES = 2200`) |
-| **Cell 7** | Hàm tính toán chuẩn 38 chỉ số khoa học trên GPU Tensor |
-| **Cell 8** | **Vòng lặp Benchmark tuần tự 3 tỉ lệ (2× $\\rightarrow$ 3× $\\rightarrow$ 4×)** kèm Auto-Checkpoint |
-| **Cell 9** | Thống kê tổng hợp đa chiều & Đối chiếu kết quả giữa các Scale |
-| **Cell 10** | Xuất các file báo cáo JSON & CSV chuẩn hóa ra thư mục Output |
-| **Cell 11** | Đóng gói toàn bộ kết quả vào file ZIP tải về (`compact_srcnn_rtl_benchmark_results.zip`) |
-| **Cell 12** | Trực quan hóa ảnh mẫu so sánh trực quan (Ground Truth vs Bicubic vs Compact SRCNN) |
-| **Cell 13** | Giải phóng tài nguyên VRAM và tổng kết tiến trình |
+| **Cell 1** | Cài đặt thư viện (`lpips`, `pytorch-msssim`, `pyiqa`) & Tự động định vị/nạp trọng số RTL |
+| **Cell 2** | Khởi tạo GPU CUDA & Bộ hàm đo lường metric siêu tốc trên Tensor |
+| **Cell 3** | Khởi tạo kiến trúc mô hình **Compact SRCNN RTL** và bộ nạp trọng số |
+| **Cell 4** | Smoke Test kiểm tra tính tương thích và shape đầu ra cho cả 3 Scale (2×, 3×, 4×) |
+| **Cell 5** | Quét tập dữ liệu ảnh `duc24kdl/sub-x-ray` |
+| **Cell 6** | Cấu hình tham số đánh giá |
+| **Cell 7** | Định nghĩa hàm tính toán chuẩn 38 chỉ số khoa học |
+| **Cell 8** | **Vòng lặp Benchmark tuần tự 3 tỉ lệ (2× $\\rightarrow$ 3× $\\rightarrow$ 4×)** |
+| **Cell 9** | Thống kê tổng hợp và đối sánh giữa các Scale |
+| **Cell 10** | Xuất file kết quả JSON & CSV chuẩn hóa |
+| **Cell 11** | Đóng gói toàn bộ kết quả vào file ZIP tải về |
+| **Cell 12** | Giải phóng tài nguyên VRAM |
 """)
 
 # ------------------------------------------------------------------------------
-# CELL 1: Install & Embedded Weights
+# CELL 1: Cài đặt thư viện & Định vị trọng số (Khớp Cell 1 ESPCN)
 # ------------------------------------------------------------------------------
 add_code(f"""# ╔══════════════════════════════════════════════════════════════╗
-# ║  CELL 1 — Cài Đặt Thư Viện & Nạp Trọng Số RTL Tự Hành       ║
+# ║  CELL 1 — Cài Đặt Thư Viện & Định Vị Trọng Số Cho Model      ║
 # ╚══════════════════════════════════════════════════════════════╝
 
 import os, sys, glob, shutil, json, time, math, gc
 import numpy as np
 
-print("1. Kiểm tra và cài đặt các thư viện đo lường khoa học...")
+print("1. Đang kiểm tra và cài đặt các thư viện đo lường khoa học...")
 try:
     import lpips
     import pytorch_msssim
@@ -105,65 +103,73 @@ except ImportError:
 print("✓ Thư viện đã sẵn sàng: lpips, pytorch-msssim, pyiqa, scikit-image.")
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 2. TRỌNG SỐ RTL ĐƯỢC NHÚNG SẴN (EMBEDDED WEIGHTS) — KHÔNG LO THIẾU FILE
+# 2. Định vị hoặc giải mã trọng số RTL phần cứng (1.624 weights Q7 và 25 biases Q14)
 # ─────────────────────────────────────────────────────────────────────────────
 EMBEDDED_WEIGHTS_HEX = "{weights_hex_str}"
 EMBEDDED_BIASES_HEX  = "{biases_hex_str}"
 
-def get_rtl_weights_and_biases():
-    \"\"\"
-    Tải trọng số phần cứng RTL (1.624 weights Q7 và 25 biases Q14).
-    Ưu tiên tìm file cục bộ; nếu không có, tự động giải mã từ chuỗi nhúng.
-    \"\"\"
-    w_files = glob.glob("/kaggle/input/**/weights_hex_clean.txt", recursive=True) + \\
-              glob.glob("./**/weights_hex_clean.txt", recursive=True) + \\
-              glob.glob("weights_hex_clean.txt")
-    b_files = glob.glob("/kaggle/input/**/biases_hex_clean.txt", recursive=True) + \\
-              glob.glob("./**/biases_hex_clean.txt", recursive=True) + \\
-              glob.glob("biases_hex_clean.txt")
+def locate_or_fetch_rtl_weights():
+    candidate_w = glob.glob("/kaggle/input/**/weights_hex_clean.txt", recursive=True) + \\
+                  glob.glob("./**/weights_hex_clean.txt", recursive=True) + \\
+                  glob.glob("weights_hex_clean.txt")
+    candidate_b = glob.glob("/kaggle/input/**/biases_hex_clean.txt", recursive=True) + \\
+                  glob.glob("./**/biases_hex_clean.txt", recursive=True) + \\
+                  glob.glob("biases_hex_clean.txt")
 
-    if w_files and b_files and os.path.exists(w_files[0]) and os.path.exists(b_files[0]):
-        print(f"✓ Tìm thấy file trọng số phần cứng tại: {{w_files[0]}}")
-        with open(w_files[0]) as f:
+    if candidate_w and candidate_b and os.path.exists(candidate_w[0]) and os.path.exists(candidate_b[0]):
+        print(f"✓ Tìm thấy file trọng số phần cứng tại: {{candidate_w[0]}}")
+        with open(candidate_w[0]) as f:
             w_lines = [l.strip() for l in f if l.strip()]
-        with open(b_files[0]) as f:
+        with open(candidate_b[0]) as f:
             b_lines = [l.strip() for l in f if l.strip()]
-        src_label = f"File cục bộ ({{w_files[0]}})"
+        w_source = f"File cục bộ ({{candidate_w[0]}})"
     else:
-        print("✓ Sử dụng trọng số phần cứng RTL được nhúng trực tiếp trong Notebook (100% self-contained).")
+        print("✓ Nạp trọng số RTL trực tiếp từ bộ nhúng Embedded Weights (100% self-contained).")
         w_lines = [EMBEDDED_WEIGHTS_HEX[i:i+2] for i in range(0, len(EMBEDDED_WEIGHTS_HEX), 2)]
         b_lines = [h.strip() for h in EMBEDDED_BIASES_HEX.split(",") if h.strip()]
-        src_label = "Embedded RTL Weights (1-16-8-1, 1.649 params)"
+        w_source = "Embedded RTL Weights (1-16-8-1, 1.649 params)"
 
     assert len(w_lines) == 1624, f"Số lượng weights không khớp: {{len(w_lines)}} != 1624"
     assert len(b_lines) == 25, f"Số lượng biases không khớp: {{len(b_lines)}} != 25"
 
-    # Chuyển đổi sang mảng số nguyên signed int8 (Q7) và int32 (Q14)
     q7_weights = np.array([int(h, 16) for h in w_lines], dtype=np.uint8).view(np.int8)
     q14_biases = np.array([int(h, 16) for h in b_lines], dtype=np.uint32).view(np.int32)
+    return q7_weights, q14_biases, w_source
 
-    return q7_weights, q14_biases, src_label
-
-q7_weights, q14_biases, weights_source = get_rtl_weights_and_biases()
-print(f"  • Nguồn trọng số : {{weights_source}}")
-print(f"  • Weights Q7     : {{len(q7_weights)}} entries (non-zero: {{np.count_nonzero(q7_weights)}})")
-print(f"  • Biases Q14     : {{len(q14_biases)}} entries (non-zero: {{np.count_nonzero(q14_biases)}})")
+Q7_WEIGHTS, Q14_BIASES, WEIGHTS_SOURCE = locate_or_fetch_rtl_weights()
+print(f"📂 Nguồn trọng số chính thức: {{WEIGHTS_SOURCE}}")
+print(f"  • Q7 weights : {{len(Q7_WEIGHTS)}} entries (non-zero: {{np.count_nonzero(Q7_WEIGHTS)}})")
+print(f"  • Q14 biases : {{len(Q14_BIASES)}} entries (non-zero: {{np.count_nonzero(Q14_BIASES)}})")
 """)
 
 # ------------------------------------------------------------------------------
-# CELL 2: GPU Init & Metrics Functions
+# CELL 2: GPU Init & Metrics Functions (Khớp 100% Cell 2 ESPCN)
 # ------------------------------------------------------------------------------
 add_code("""# ╔══════════════════════════════════════════════════════════════╗
 # ║  CELL 2 — Khởi Tạo Thiết Bị & Bộ Hàm Đo Tối Ưu Hóa GPU CUDA ║
 # ╚══════════════════════════════════════════════════════════════╝
 
+import os
+import sys
+import glob
+import time
+import json
+import math
+import copy
+import gc
+import warnings
+import numpy as np
+import pandas as pd
+from PIL import Image
+from tqdm import tqdm
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import pandas as pd
-from PIL import Image
-from tqdm.auto import tqdm
-import warnings
+from torchvision.transforms.functional import to_tensor
+
+from skimage.metrics import peak_signal_noise_ratio as psnr_fn
+from skimage.metrics import structural_similarity as ssim_fn
 
 warnings.filterwarnings('ignore')
 
@@ -174,7 +180,7 @@ if DEVICE == 'cuda':
     print(f"✓ Thiết bị tính toán: GPU [{gpu_name}] | VRAM: {vram_gb:.2f} GB")
     torch.backends.cudnn.benchmark = True
 else:
-    print("⚠ Thiết bị tính toán: CPU (Khuyến nghị bật GPU T4 x2 hoặc P100 trên Kaggle để đạt tốc độ cao)")
+    print("⚠ Thiết bị tính toán: CPU (Khuyến nghị bật GPU T4/P100 trên Kaggle để đạt tốc độ cao)")
 
 # 1. Khởi tạo LPIPS (AlexNet)
 try:
@@ -212,7 +218,7 @@ except Exception as e:
     print(f"⚠ NIQE không khả dụng ({e})")
 
 # ─────────────────────────────────────────────────────────────────────────────
-# BỘ HÀM TÍNH TOÁN METRIC SIÊU TỐC TRÊN GPU TENSOR (Thời gian chạy < 1ms)
+# BỘ HÀM TÍNH TOÁN METRIC SIÊU TỐC TRÊN GPU TENSOR (Chạy dưới 1ms)
 # ─────────────────────────────────────────────────────────────────────────────
 def calc_psnr(t_true, t_test):
     with torch.no_grad():
@@ -225,8 +231,9 @@ def calc_ssim(t_true, t_test):
     if HAS_MSSSIM:
         with torch.no_grad():
             return float(pytorch_msssim.ssim(t_test, t_true, data_range=1.0).item())
-    diff = (t_true - t_test).abs().mean().item()
-    return float(max(0.0, 1.0 - diff))
+    t1_np = (t_true.squeeze(0).permute(1,2,0).cpu().numpy()*255).clip(0, 255).astype(np.uint8)
+    t2_np = (t_test.squeeze(0).permute(1,2,0).cpu().numpy()*255).clip(0, 255).astype(np.uint8)
+    return float(ssim_fn(t1_np, t2_np, data_range=255, channel_axis=2))
 
 def calc_msssim(t_true, t_test):
     if HAS_MSSSIM and MS_SSIM_FN is not None:
@@ -254,7 +261,7 @@ def calc_niqe(t_img):
                 return float(NIQE_FN(t_img).item())
         except Exception:
             pass
-    # GPU Tensor Fallback nhanh
+    # GPU Tensor Fallback nhanh (< 1ms thay vì convolve2d trên CPU)
     with torch.no_grad():
         gray = 0.2989 * t_img[:, 0:1] + 0.5870 * t_img[:, 1:2] + 0.1140 * t_img[:, 2:3]
         k7 = torch.ones(1, 1, 7, 7, device=t_img.device, dtype=t_img.dtype) / 49.0
@@ -285,11 +292,19 @@ print("✓ Bộ hàm đo khoa học GPU tối ưu đã sẵn sàng: PSNR, SSIM, 
 """)
 
 # ------------------------------------------------------------------------------
-# CELL 3: Architecture Definition (Bit-Accurate RTL)
+# CELL 3: Model Architecture & load_target_model (Khớp Cell 3 ESPCN)
 # ------------------------------------------------------------------------------
 add_code("""# ╔══════════════════════════════════════════════════════════════╗
-# ║  CELL 3 — Định Nghĩa Mô Hình Compact SRCNN RTL Bit-Accurate  ║
+# ║  CELL 3 — Kiến Trúc Mô Hình Compact SRCNN RTL & Bộ Nạp       ║
 # ╚══════════════════════════════════════════════════════════════╝
+
+import os
+import sys
+import glob
+import math
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
 class CompactSRCNN_RTL(nn.Module):
     \"\"\"
@@ -309,19 +324,13 @@ class CompactSRCNN_RTL(nn.Module):
         self.upscale_factor = upscale_factor
 
         # Tách cấu trúc trọng số
-        # Layer 1: 16 x 1 x 9 x 9 = 1.296 weights, 16 biases
         w1_int = q7_w[0:1296].reshape(16, 1, 9, 9).astype(np.int64)
         b1_int = q14_b[0:16].astype(np.int64)
-
-        # Layer 2: 8 x 16 x 1 x 1 = 128 weights, 8 biases
         w2_int = q7_w[1296:1424].reshape(8, 16, 1, 1).astype(np.int64)
         b2_int = q14_b[16:24].astype(np.int64)
-
-        # Layer 3: 1 x 8 x 5 x 5 = 200 weights, 1 bias
         w3_int = q7_w[1424:1624].reshape(1, 8, 5, 5).astype(np.int64)
         b3_int = q14_b[24:25].astype(np.int64)
 
-        # Đăng ký buffers để thực thi song song trên GPU
         self.register_buffer("w1", torch.from_numpy(w1_int).float())
         self.register_buffer("b1", torch.from_numpy(b1_int).float())
         self.register_buffer("w2", torch.from_numpy(w2_int).float())
@@ -333,24 +342,16 @@ class CompactSRCNN_RTL(nn.Module):
         assert self.num_params == 1649, f"Tổng tham số: {self.num_params} ≠ 1649"
 
     def forward_grayscale(self, gray_lr):
-        \"\"\"
-        Forward pass cho kênh ảnh xám Y (hoặc ảnh 1 kênh):
-          gray_lr: Tensor shape [B, 1, H_lr, W_lr] trong miền [0.0, 1.0].
-        Returns:
-          gray_sr: Tensor shape [B, 1, H_hr, W_hr] trong miền [0.0, 1.0].
-        \"\"\"
         # 1. Nội suy Bicubic lên kích thước mục tiêu
         x_bic = F.interpolate(gray_lr, scale_factor=self.upscale_factor, mode='bicubic', align_corners=False)
 
         # 2. Chuyển sang miền điểm 0 phần cứng: Pixel S7.0 [-128, 127]
-        # x_px trong [0, 255] -> trừ 128
         x_px = torch.clamp(torch.round(x_bic * 255.0), 0.0, 255.0)
         x_s7 = (x_px - 128.0)
 
         # 3. Layer 1: Conv 9x9, Pad 4 -> acc >> 7 -> ReLU [0, 127]
         x_pad1 = F.pad(x_s7, (4, 4, 4, 4), mode='constant', value=0.0)
         acc1 = F.conv2d(x_pad1, self.w1, self.b1)
-        # Mô phỏng bit shift >> 7 chính xác
         shifted1 = torch.floor(acc1 / 128.0)
         l1 = torch.clamp(shifted1, 0.0, 127.0)
 
@@ -365,19 +366,13 @@ class CompactSRCNN_RTL(nn.Module):
         shifted3 = torch.floor(acc3 / 128.0)
         l3 = torch.clamp(shifted3 + 128.0, 0.0, 255.0)
 
-        # 6. Chuẩn hóa về [0.0, 1.0]
         return l3 / 255.0
 
     def forward(self, x):
-        \"\"\"
-        Xử lý đa kênh RGB bằng cách chuyển sang miền YCbCr,
-        áp dụng SRCNN RTL trên kênh Y và ghép lại với Bicubic (Cb, Cr).
-        Nếu đầu vào là 1 kênh, xử lý trực tiếp.
-        \"\"\"
         if x.shape[1] == 1:
             return self.forward_grayscale(x)
 
-        # Chuyển RGB -> YCbCr chuẩn ITU-R BT.601
+        # RGB -> YCbCr BT.601
         r = x[:, 0:1]
         g = x[:, 1:2]
         b = x[:, 2:3]
@@ -385,14 +380,10 @@ class CompactSRCNN_RTL(nn.Module):
         cb = -0.168736 * r - 0.331264 * g + 0.500000 * b + 0.5
         cr =  0.500000 * r - 0.418688 * g - 0.081312 * b + 0.5
 
-        # Siêu phân giải kênh Y bằng phần cứng RTL
         y_sr = self.forward_grayscale(y)
-
-        # Phóng đại Cb, Cr bằng Bicubic
         cb_sr = F.interpolate(cb, scale_factor=self.upscale_factor, mode='bicubic', align_corners=False)
         cr_sr = F.interpolate(cr, scale_factor=self.upscale_factor, mode='bicubic', align_corners=False)
 
-        # Chuyển ngược YCbCr -> RGB
         cb_shifted = cb_sr - 0.5
         cr_shifted = cr_sr - 0.5
         r_sr = y_sr + 1.402000 * cr_shifted
@@ -401,11 +392,24 @@ class CompactSRCNN_RTL(nn.Module):
 
         return torch.clamp(torch.cat([r_sr, g_sr, b_sr], dim=1), 0.0, 1.0)
 
-print("✓ Đã định nghĩa thành công kiến trúc CompactSRCNN_RTL (1-16-8-1, đúng 1.649 params).")
+
+def load_target_model(upscale_factor: int, device: str = DEVICE):
+    \"\"\"Nạp mô hình Compact SRCNN RTL theo scale chỉ định (2x, 3x, 4x).\"\"\"
+    model = CompactSRCNN_RTL(Q7_WEIGHTS, Q14_BIASES, upscale_factor=upscale_factor)
+    model.to(device)
+    model.eval()
+    for param in model.parameters():
+        param.requires_grad = False
+
+    num_params = model.num_params
+    print(f"✓ Nạp thành công [Compact SRCNN RTL {upscale_factor}×]: {num_params:,} tham số ({WEIGHTS_SOURCE})")
+    return model, num_params, WEIGHTS_SOURCE
+
+print("✓ Bộ định nghĩa kiến trúc và nạp trọng số Compact SRCNN RTL đã sẵn sàng.")
 """)
 
 # ------------------------------------------------------------------------------
-# CELL 4: Smoke Test
+# CELL 4: Smoke Test (Khớp Cell 4 ESPCN)
 # ------------------------------------------------------------------------------
 add_code("""# ╔══════════════════════════════════════════════════════════════╗
 # ║  CELL 4 — Smoke Test: Xác Thực Cả 3 Scale (2x, 3x, 4x)       ║
@@ -420,17 +424,16 @@ print("─" * 70)
 for s in test_scales:
     try:
         t0 = time.perf_counter()
-        model_s = CompactSRCNN_RTL(q7_weights, q14_biases, upscale_factor=s).to(DEVICE)
-        model_s.eval()
+        m_inst, p_cnt, w_p = load_target_model(upscale_factor=s)
         with torch.no_grad():
-            out = model_s(dummy_lr)
+            out = m_inst(dummy_lr)
         if DEVICE == 'cuda': torch.cuda.synchronize()
         dt = (time.perf_counter() - t0) * 1000.0
         exp_h, exp_w = 256 * s, 256 * s
         act_h, act_w = out.shape[-2], out.shape[-1]
         assert (act_h, act_w) == (exp_h, exp_w), f"Sai shape: nhận {out.shape}, mong đợi (1, 3, {exp_h}, {exp_w})"
         print(f"  • Scale {s}x: Input [1, 3, 256, 256] -> Output {list(out.shape)} | Latency: {dt:6.2f} ms | OK")
-        del model_s
+        del m_inst
         gc.collect()
         if DEVICE == 'cuda': torch.cuda.empty_cache()
     except Exception as e:
@@ -441,7 +444,7 @@ print("✓ Mô hình Compact SRCNN RTL đã vượt qua bài kiểm tra sơ bộ
 """)
 
 # ------------------------------------------------------------------------------
-# CELL 5: Dataset Discovery
+# CELL 5: Quét tập dữ liệu ảnh (Khớp 100% Cell 5 ESPCN)
 # ------------------------------------------------------------------------------
 add_code("""# ╔══════════════════════════════════════════════════════════════╗
 # ║  CELL 5 — Quét Tập Dữ Liệu duc24kdl/sub-x-ray                ║
@@ -505,10 +508,7 @@ def find_sub_xray_dataset():
     print("─" * 70)
 
     if not all_images:
-        print("⚠ Cảnh báo: Không tìm thấy thư mục sub-x-ray. Đang quét toàn bộ file ảnh có trong Kaggle Input...")
-        all_images = sorted(glob.glob('/kaggle/input/**/*', recursive=True))
-        all_images = [p for p in all_images if p.endswith(valid_exts)]
-        print(f"✓ Tổng số ảnh quét được từ fallback: {len(all_images)} ảnh")
+        raise FileNotFoundError("Không tìm thấy ảnh nào! Vui lòng thêm dataset duc24kdl/sub-x-ray vào Kaggle Notebook.")
 
     return all_images, nih_images, chest_images
 
@@ -516,37 +516,35 @@ all_images, nih_images, chest_images = find_sub_xray_dataset()
 """)
 
 # ------------------------------------------------------------------------------
-# CELL 6: Configuration
+# CELL 6: Cấu hình tham số đánh giá (Khớp 100% Cell 6 ESPCN)
 # ------------------------------------------------------------------------------
 add_code("""# ╔══════════════════════════════════════════════════════════════╗
 # ║  CELL 6 — Cấu Hình Tham Số Đánh Giá Cho Compact SRCNN RTL    ║
 # ╚══════════════════════════════════════════════════════════════╝
 
 # 1. Mô hình mục tiêu:
-TARGET_MODEL = "Compact_SRCNN_RTL"
-MODEL_PARAMS = 1649
+TARGET_MODEL = "compact_srcnn_rtl"
 
 # 2. Danh sách các tỉ lệ cần đánh giá tuần tự:
 # Mô hình sẽ chạy trọn vẹn 2x, sau đó sang 3x, và kết thúc ở 4x
 SCALES_TO_RUN = [2, 3, 4]
 
 # 3. Số lượng ảnh chạy:
-# • Đặt 2200 để chạy trọn vẹn toàn bộ dataset 2.200 ảnh y tế
-# • Đặt 50 hoặc 100 nếu muốn kiểm tra nhanh
+# • Đặt 2200 để chạy trọn vẹn toàn bộ dataset
+# • Đặt 100 để kiểm tra nhanh trong 1-2 phút
 MAX_IMAGES = 2200
 
 # 4. Cấu hình lưu trữ:
-SAVE_PNG_IMAGES  = False  # Bật True nếu muốn xuất file ảnh PNG kết quả
-OUTPUT_DIR       = '/kaggle/working/results/hardware'
+SAVE_PNG_IMAGES  = False  # Đổi thành True nếu muốn xuất file ảnh PNG
+OUTPUT_DIR       = '/kaggle/working/results'
 CHECKPOINT_EVERY = 100
-LOG_EVERY        = 25
+LOG_EVERY        = 20
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 images_to_run = all_images[:MAX_IMAGES] if MAX_IMAGES and len(all_images) >= MAX_IMAGES else all_images
 
 print('═════════════════════════════════════════════════════════════')
-print(f'  CẤU HÌNH PHIÊN BENCHMARK: {TARGET_MODEL}')
-print(f'  ✓ Kiến trúc                : 1 -> 16 -> 8 -> 1 ({MODEL_PARAMS:,} tham số)')
+print(f'  CẤU HÌNH PHIÊN BENCHMARK MÔ HÌNH: Compact SRCNN RTL (1-16-8-1)')
 print(f'  ✓ Danh sách tỉ lệ (Scales) : {SCALES_TO_RUN}')
 print(f'  ✓ Độ phân giải             : Giữ nguyên độ phân giải gốc của từng ảnh')
 print(f'  ✓ Số lượng ảnh đánh giá   : {len(images_to_run):,} ảnh')
@@ -556,7 +554,7 @@ print('════════════════════════�
 """)
 
 # ------------------------------------------------------------------------------
-# CELL 7: Metrics schema
+# CELL 7: Hàm tính 38 chỉ số khoa học (Khớp 100% Cell 7 ESPCN)
 # ------------------------------------------------------------------------------
 add_code("""# ╔══════════════════════════════════════════════════════════════╗
 # ║  CELL 7 — Hàm Tính Toán Chuẩn Hóa 38 Chỉ Số Khoa Học Trên GPU ║
@@ -565,8 +563,8 @@ add_code("""# ╔═════════════════════
 def compute_image_metrics(hr_tensor, bic_tensor, sr_tensor,
                           latency_ms, img_path, dataset_name, scale_factor, saved_path=""):
     \"\"\"
-    Tính toán chuẩn 38 trường dữ liệu khoa học tương thích 100% với schema báo cáo.
-    Thực thi trực tiếp trên GPU Tensor để đạt tốc độ tối đa.
+    Tính toán đúng 38 trường dữ liệu khớp 100% với schema chuẩn.
+    Tất cả các phép tính thực thi trực tiếp trên GPU Tensor để đạt tốc độ tối đa.
     \"\"\"
     with torch.no_grad():
         # 1. Chỉ số Bicubic Baseline
@@ -578,7 +576,7 @@ def compute_image_metrics(hr_tensor, bic_tensor, sr_tensor,
         mse_bic  = float(torch.mean((hr_tensor - bic_tensor) ** 2).item() * (255.0 ** 2))
         rmse_bic = float(np.sqrt(mse_bic))
 
-        # 2. Chỉ số Model Compact SRCNN RTL
+        # 2. Chỉ số Model Super-Resolution
         p_sr    = calc_psnr(hr_tensor, sr_tensor)
         s_sr    = calc_ssim(hr_tensor, sr_tensor)
         ms_sr   = calc_msssim(hr_tensor, sr_tensor)
@@ -648,13 +646,11 @@ print("✓ Hàm compute_image_metrics() GPU hoàn tất chuẩn hóa 38 trườn
 """)
 
 # ------------------------------------------------------------------------------
-# CELL 8: Benchmark Loop
+# CELL 8: Vòng lặp benchmark tuần tự (Khớp 100% Cell 8 ESPCN)
 # ------------------------------------------------------------------------------
 add_code("""# ╔══════════════════════════════════════════════════════════════╗
 # ║  CELL 8 — 🚀 VÒNG LẶP BENCHMARK COMPACT SRCNN RTL (2x, 3x, 4x)║
 # ╚══════════════════════════════════════════════════════════════╝
-
-from torchvision.transforms.functional import to_tensor
 
 def save_checkpoint(results_list, elapsed_sec, path):
     n_ok = sum(1 for r in results_list if r.get('status') == 'ok')
@@ -669,67 +665,61 @@ def save_checkpoint(results_list, elapsed_sec, path):
 all_scale_runs = {}
 total_images = len(images_to_run)
 
-print(f"BẮT ĐẦU TIẾN TRÌNH BENCHMARK MÔ HÌNH: Compact SRCNN RTL (1-16-8-1, 1.649 params)")
+print(f"BẮT ĐẦU TIẾN TRÌNH BENCHMARK MÔ HÌNH: Compact SRCNN RTL (1-16-8-1)")
 print(f"CÁC TỈ LỆ ĐÁNH GIÁ: {SCALES_TO_RUN} | SỐ ẢNH MỖI TỈ LỆ: {total_images:,}")
 print("═" * 80)
 
 for s_idx, scale_factor in enumerate(SCALES_TO_RUN, 1):
     print(f"\\n▶ [TỈ LỆ {s_idx}/{len(SCALES_TO_RUN)}] ĐANG CHẠY COMPACT SRCNN RTL SCALE {scale_factor}X...")
     
-    # 1. Khởi tạo mô hình Bit-Accurate cho scale này
-    cur_model = CompactSRCNN_RTL(q7_weights, q14_biases, upscale_factor=scale_factor).to(DEVICE)
-    cur_model.eval()
-
+    # 1. Khởi tạo mô hình cho scale này
+    cur_model, params_count, w_source = load_target_model(upscale_factor=scale_factor)
+    
     scale_records = []
-    checkpoint_file = os.path.join(OUTPUT_DIR, f"compact_srcnn_rtl_{scale_factor}x_checkpoint.json")
+    checkpoint_file = os.path.join(OUTPUT_DIR, f"{TARGET_MODEL}_{scale_factor}x_checkpoint.json")
     t_start = time.perf_counter()
-
-    # Warmup GPU
-    with torch.no_grad():
-        _ = cur_model(torch.zeros(1, 3, 128, 128, device=DEVICE))
-    if DEVICE == 'cuda': torch.cuda.synchronize()
-
+    
     # 2. Lặp qua từng ảnh trong tập dữ liệu
     for idx, img_path in enumerate(tqdm(images_to_run, desc=f"Compact SRCNN RTL {scale_factor}x")):
         dataset_name = os.path.basename(os.path.dirname(img_path)) or 'unknown'
-
+        
         try:
-            # Đọc ảnh gốc HR, căn chỉnh kích thước chia hết cho scale_factor
+            # Giữ nguyên độ phân giải gốc của ảnh, căn chỉnh crop chia hết cho scale_factor
             hr_pil = Image.open(img_path).convert('RGB')
             orig_w, orig_h = hr_pil.size
             crop_w = (orig_w // scale_factor) * scale_factor
             crop_h = (orig_h // scale_factor) * scale_factor
             if (crop_w, crop_h) != (orig_w, orig_h):
                 hr_pil = hr_pil.crop((0, 0, crop_w, crop_h))
-
+            
             lr_w, lr_h = crop_w // scale_factor, crop_h // scale_factor
             lr_pil  = hr_pil.resize((lr_w, lr_h), Image.BICUBIC)
             bic_pil = lr_pil.resize((crop_w, crop_h), Image.BICUBIC)
-
+            
             # Chuẩn bị Tensor trực tiếp trên GPU
             hr_tensor  = to_tensor(hr_pil).unsqueeze(0).to(DEVICE)
             lr_tensor  = to_tensor(lr_pil).unsqueeze(0).to(DEVICE)
             bic_tensor = to_tensor(bic_pil).unsqueeze(0).to(DEVICE)
-
+            
             # Đo đạc thời gian suy luận (Latency ms)
             if DEVICE == 'cuda': torch.cuda.synchronize()
             t0 = time.perf_counter()
-
+            
             with torch.no_grad():
                 sr_tensor = cur_model(lr_tensor)
             if DEVICE == 'cuda': torch.cuda.synchronize()
-
+            
             latency_ms = (time.perf_counter() - t0) * 1000.0
             sr_tensor  = torch.clamp(sr_tensor, 0.0, 1.0)
-
+            
             # Lưu ảnh nếu được bật
             saved_path = None
             if SAVE_PNG_IMAGES:
-                out_name = f"compact_srcnn_{scale_factor}x_{os.path.basename(img_path)}"
+                out_name = f"{TARGET_MODEL}_{scale_factor}x_{os.path.basename(img_path)}"
                 saved_path = os.path.join(OUTPUT_DIR, out_name)
                 sr_np = (sr_tensor.squeeze(0).permute(1, 2, 0).cpu().numpy() * 255.0).round().astype(np.uint8)
                 Image.fromarray(sr_np).save(saved_path)
-
+            
             # Tính 38 chỉ số trực tiếp trên GPU
             rec = compute_image_metrics(
                 hr_tensor=hr_tensor, bic_tensor=bic_tensor, sr_tensor=sr_tensor,
@@ -737,57 +727,68 @@ for s_idx, scale_factor in enumerate(SCALES_TO_RUN, 1):
                 dataset_name=dataset_name, scale_factor=scale_factor, saved_path=saved_path or ""
             )
             scale_records.append(rec)
-
+            
             # Thu dọn tensor tránh rò rỉ bộ nhớ
             del hr_tensor, lr_tensor, bic_tensor, sr_tensor
-
+            
         except Exception as e:
             scale_records.append({
                 'source_path': img_path, 'dataset': dataset_name,
                 'filename': os.path.basename(img_path), 'status': f'error: {str(e)}'
             })
-
-        # Log định kỳ
-        if (idx + 1) % LOG_EVERY == 0:
-            cur_ok = [r for r in scale_records if r.get('status') == 'ok']
-            if cur_ok:
-                p_b = cur_ok[-1]['psnr_bicubic_db']
-                p_s = cur_ok[-1]['psnr_model_db']
-                g_p = cur_ok[-1]['psnr_gain_db']
-                lp  = cur_ok[-1]['lpips']
-                fn  = cur_ok[-1]['filename']
-                print(f"  [{idx+1:>4d}/{total_images}] {fn:<22s} bic={p_b:.2f}dB fpga={p_s:.2f}dB gain={g_p:+.2f}dB lpips={lp:.3f}")
-
-        # Lưu checkpoint định kỳ
+            
+        # Lưu checkpoint định kỳ và giải phóng cache
         if (idx + 1) % CHECKPOINT_EVERY == 0 or (idx + 1) == total_images:
             save_checkpoint(scale_records, time.perf_counter() - t_start, checkpoint_file)
             if DEVICE == 'cuda':
                 torch.cuda.empty_cache()
-
+            
     elapsed_total = time.perf_counter() - t_start
     all_scale_runs[scale_factor] = {
         'records': scale_records,
         'elapsed_sec': elapsed_total,
-        'weights_source': weights_source,
-        'params_count': cur_model.num_params
+        'weights_source': w_source,
+        'params_count': params_count
     }
     print(f"✓ Hoàn thành Compact SRCNN RTL Scale {scale_factor}x: {len(scale_records):,} ảnh trong {elapsed_total/60:.2f} phút | Checkpoint: {checkpoint_file}")
-
-    # Giải phóng mô hình trước khi sang scale kế tiếp
+    
+    # Giải phóng model và dọn dẹp VRAM trước khi chuyển sang scale kế tiếp
     del cur_model
     gc.collect()
     if DEVICE == 'cuda': torch.cuda.empty_cache()
 
 print("═" * 80)
-print("✓ COMPACT SRCNN RTL ĐÃ HOÀN TẤT ĐÁNH GIÁ TRÊN CẢ 3 TỈ LỆ (2X, 3X, 4X) THÀNH CÔNG!")
+print(f"✓ COMPACT SRCNN RTL ĐÃ HOÀN TẤT ĐÁNH GIÁ TRÊN CẢ 3 TỈ LỆ (2X, 3X, 4X) THÀNH CÔNG!")
 """)
 
 # ------------------------------------------------------------------------------
-# CELL 9: Statistical Summary
+# CELL 9: Thống kê & Tổng hợp kết quả (Khớp 100% Cell 9 ESPCN)
 # ------------------------------------------------------------------------------
 add_code("""# ╔══════════════════════════════════════════════════════════════╗
 # ║  CELL 9 — Thống Kê & Tổng Hợp Kết Quả Compact SRCNN RTL      ║
 # ╚══════════════════════════════════════════════════════════════╝
+
+# Tự động phục hồi kết quả từ các file checkpoint đã lưu trong OUTPUT_DIR nếu kernel vừa restart
+if not all_scale_runs:
+    for s in SCALES_TO_RUN:
+        cf_pattern = os.path.join(OUTPUT_DIR, f"{TARGET_MODEL}_{s}x_checkpoint.json")
+        bf_pattern = os.path.join(OUTPUT_DIR, f"{TARGET_MODEL}_{s}x_benchmark.json")
+        chosen_file = cf_pattern if os.path.exists(cf_pattern) else (bf_pattern if os.path.exists(bf_pattern) else None)
+        if chosen_file:
+            try:
+                with open(chosen_file, 'r', encoding='utf-8') as fh:
+                    cdata = json.load(fh)
+                    recs = cdata.get('records') or cdata.get('per_image_results', [])
+                    if recs:
+                        all_scale_runs[s] = {
+                            'records': recs,
+                            'elapsed_sec': cdata.get('elapsed_sec_accumulated', 0),
+                            'weights_source': 'checkpoint_file',
+                            'params_count': 1649
+                        }
+                        print(f"✓ Đã tự động phục hồi {len(recs):,} kết quả của Scale {s}x từ file checkpoint!")
+            except Exception:
+                pass
 
 scale_comparison_rows = []
 
@@ -797,23 +798,22 @@ for s_key in sorted(all_scale_runs.keys()):
     df_s = pd.DataFrame([r for r in records if r.get('status') == 'ok'])
     if df_s.empty:
         continue
-
+        
     p_mean  = df_s['psnr_model_db'].mean()
     s_mean  = df_s['ssim_model'].mean()
-    ms_mean = df_s['msssim_fpga'].mean()
-    lp_mean = df_s['lpips'].mean()
-    nq_mean = df_s['niqe_fpga'].mean()
+    ms_mean = df_s['msssim_fpga'].mean() if 'msssim_fpga' in df_s.columns else df_s['msssim_bicubic'].mean()
+    lp_mean = df_s['lpips'].mean() if 'lpips' in df_s.columns else df_s['lpips_bicubic'].mean()
+    nq_mean = df_s['niqe_fpga'].mean() if 'niqe_fpga' in df_s.columns else df_s['niqe_bicubic'].mean()
     lat_med = df_s['latency_ms'].median()
     fps_val = 1000.0 / df_s['latency_ms'].mean() if df_s['latency_ms'].mean() > 0 else 0
     epi_val = df_s['epi'].mean()
-
+    
     p_gain  = df_s['psnr_gain_db'].mean()
     lp_gain = df_s['lpips_gain'].mean()
-    pct_gain_pos = (df_s['psnr_gain_db'] > 0).mean() * 100.0
-
+    
     df_nih   = df_s[df_s['dataset'] == 'sub_NIH']
     df_chest = df_s[df_s['dataset'] == 'sub_chest']
-
+    
     scale_comparison_rows.append({
         'Model': 'Compact SRCNN RTL (1-16-8-1)',
         'Scale': f'{s_key}x',
@@ -825,28 +825,27 @@ for s_key in sorted(all_scale_runs.keys()):
         'NIQE ↓': round(nq_mean, 2),
         'EPI': round(epi_val, 4),
         'PSNR Gain (dB)': round(p_gain, 2),
-        '% Gain > 0': f"{pct_gain_pos:.1f}%",
         'LPIPS Gain ↑': round(lp_gain, 4),
         'Latency (ms)': round(lat_med, 1),
         'FPS': round(fps_val, 1),
         'PSNR (sub_NIH)': round(df_nih['psnr_model_db'].mean(), 2) if not df_nih.empty else None,
         'PSNR (sub_chest)': round(df_chest['psnr_model_db'].mean(), 2) if not df_chest.empty else None,
-        'LPIPS (sub_NIH)': round(df_nih['lpips'].mean(), 4) if not df_nih.empty else None,
-        'LPIPS (sub_chest)': round(df_chest['lpips'].mean(), 4) if not df_chest.empty else None,
+        'LPIPS (sub_NIH)': round(df_nih['lpips'].mean(), 4) if not df_nih.empty and 'lpips' in df_nih.columns else None,
+        'LPIPS (sub_chest)': round(df_chest['lpips'].mean(), 4) if not df_chest.empty and 'lpips' in df_chest.columns else None,
     })
 
 df_scale_summary = pd.DataFrame(scale_comparison_rows)
-print("📊 BẢNG TỔNG HỢP HIỆU NĂNG COMPACT SRCNN RTL (1-16-8-1) THEO SCALE:")
-print("═" * 115)
-print(df_scale_summary[['Scale', 'Images', 'PSNR (dB)', 'SSIM', 'MS-SSIM', 'LPIPS ↓', 'NIQE ↓', 'EPI', 'PSNR Gain (dB)', '% Gain > 0', 'Latency (ms)', 'FPS']].to_string(index=False))
-print("═" * 115)
+print(f"📊 BẢNG TỔNG HỢP SO SÁNH HIỆU NĂNG COMPACT SRCNN RTL THEO SCALE:")
+print("═" * 110)
+print(df_scale_summary[['Scale', 'Images', 'PSNR (dB)', 'SSIM', 'MS-SSIM', 'LPIPS ↓', 'NIQE ↓', 'EPI', 'PSNR Gain (dB)', 'Latency (ms)', 'FPS']].to_string(index=False))
+print("═" * 110)
 """)
 
 # ------------------------------------------------------------------------------
-# CELL 10: File Export
+# CELL 10: Xuất file JSON & CSV (Khớp 100% Cell 10 ESPCN)
 # ------------------------------------------------------------------------------
 add_code("""# ╔══════════════════════════════════════════════════════════════╗
-# ║  CELL 10 — Xuất File Báo Cáo JSON & CSV Chuẩn Hóa            ║
+# ║  CELL 10 — Xuất File Kết Quả JSON & CSV Chuẩn Hóa            ║
 # ╚══════════════════════════════════════════════════════════════╝
 
 exported_files = []
@@ -856,13 +855,13 @@ for s_key, s_data in all_scale_runs.items():
     df_s = pd.DataFrame([r for r in records if r.get('status') == 'ok'])
     if df_s.empty:
         continue
-
-    json_path = os.path.join(OUTPUT_DIR, f"compact_srcnn_rtl_{s_key}x_benchmark.json")
-    csv_path  = os.path.join(OUTPUT_DIR, f"compact_srcnn_rtl_{s_key}x_benchmark.csv")
-
+        
+    json_path = os.path.join(OUTPUT_DIR, f"{TARGET_MODEL}_{s_key}x_benchmark.json")
+    csv_path  = os.path.join(OUTPUT_DIR, f"{TARGET_MODEL}_{s_key}x_benchmark.csv")
+    
     summary_dict = {
         'model': f"Compact SRCNN RTL (Scale {s_key}x)",
-        'architecture': "1 -> 16 -> 8 -> 1 (1,649 parameters)",
+        'architecture': "1 -> 16 -> 8 -> 1 (1,649 params)",
         'weights_source': s_data.get('weights_source', ''),
         'device': DEVICE,
         'images_evaluated': len(df_s),
@@ -891,7 +890,6 @@ for s_key, s_data in all_scale_runs.items():
         'avg_mean': float(round(df_s['mean'].mean(), 4)),
         'avg_std': float(round(df_s['std'].mean(), 4)),
         'avg_psnr_gain_db': float(round(df_s['psnr_gain_db'].mean(), 4)),
-        'pct_psnr_gain_positive': float(round((df_s['psnr_gain_db'] > 0).mean() * 100.0, 2)),
         'avg_msssim_gain': float(round(df_s['msssim_gain'].mean(), 4)),
         'avg_lpips_gain': float(round(df_s['lpips_gain'].mean(), 4)),
         'avg_niqe_gain': float(round(df_s['niqe_gain'].mean(), 4)),
@@ -900,104 +898,63 @@ for s_key, s_data in all_scale_runs.items():
         'elapsed_sec_total': float(round(s_data.get('elapsed_sec', 0), 2)),
         'wall_time_min': float(round(s_data.get('elapsed_sec', 0) / 60.0, 2))
     }
-
+    
     full_output = {
         'summary': summary_dict,
         'per_image_results': records
     }
-
+    
     with open(json_path, 'w', encoding='utf-8') as f:
         json.dump(full_output, f, indent=2, ensure_ascii=False)
-
+        
     df_s.to_csv(csv_path, index=False)
     exported_files.extend([json_path, csv_path])
     print(f"✓ Đã xuất: {os.path.basename(json_path)} ({os.path.getsize(json_path)/(1024*1024):.2f} MB)")
     print(f"✓ Đã xuất: {os.path.basename(csv_path)} ({os.path.getsize(csv_path)/1024:.1f} KB)")
 
 # Xuất bảng tổng hợp theo scale
-summary_csv_path  = os.path.join(OUTPUT_DIR, "compact_srcnn_rtl_multiscale_summary.csv")
-summary_json_path = os.path.join(OUTPUT_DIR, "compact_srcnn_rtl_multiscale_summary.json")
+summary_csv_path  = os.path.join(OUTPUT_DIR, f"{TARGET_MODEL}_multiscale_summary.csv")
+summary_json_path = os.path.join(OUTPUT_DIR, f"{TARGET_MODEL}_multiscale_summary.json")
 df_scale_summary.to_csv(summary_csv_path, index=False)
 df_scale_summary.to_json(summary_json_path, indent=2, orient='records')
 exported_files.extend([summary_csv_path, summary_json_path])
 
-print("\\n📂 TẤT CẢ FILE ĐÃ ĐƯỢC XUẤT THÀNH CÔNG RA:", OUTPUT_DIR)
+print("\\n📂 ĐÃ XUẤT TẤT CẢ FILE RA /kaggle/working/results SẴN SÀNG:")
 for ef in exported_files:
     print(f"  • {ef}")
 """)
 
 # ------------------------------------------------------------------------------
-# CELL 11: ZIP Packaging
+# CELL 11: Đóng gói file ZIP (Khớp 100% Cell 11 ESPCN)
 # ------------------------------------------------------------------------------
 add_code("""# ╔══════════════════════════════════════════════════════════════╗
-# ║  CELL 11 — Đóng Gói File ZIP Tải Về                          ║
+# ║  CELL 11 — Đóng Gói File ZIP Kết Quả                         ║
 # ╚══════════════════════════════════════════════════════════════╝
 
-zip_out_name = "compact_srcnn_rtl_benchmark_results.zip"
+zip_out_name = f"{TARGET_MODEL}_benchmark_results.zip"
 zip_out_path = os.path.join('/kaggle/working', zip_out_name)
 
 if os.path.exists(zip_out_path):
     os.remove(zip_out_path)
 
-cmd = f"cd {OUTPUT_DIR} && zip -r '{zip_out_path}' ."
+cmd = f"cd {OUTPUT_DIR} && zip -r '{zip_out_path}' . -i '*{TARGET_MODEL}*'"
 os.system(cmd)
 
 if os.path.exists(zip_out_path):
     sz_mb = os.path.getsize(zip_out_path) / (1024 * 1024)
     print("═" * 70)
     print(f"🎉 ĐÃ ĐÓNG GÓI THÀNH CÔNG: {zip_out_name} ({sz_mb:.2f} MB)")
-    print("👉 Bạn có thể tải file này trực tiếp từ tab 'Output' bên phải giao diện Kaggle.")
+    print("👉 Tải file này từ tab 'Output' bên phải giao diện Kaggle.")
     print("═" * 70)
 else:
     print("⚠ Chưa tạo được file zip, các file kết quả vẫn nằm nguyên tại:", OUTPUT_DIR)
 """)
 
 # ------------------------------------------------------------------------------
-# CELL 12: Visualization
+# CELL 12: Giải phóng VRAM & Hướng dẫn (Khớp 100% Cell 12 ESPCN)
 # ------------------------------------------------------------------------------
 add_code("""# ╔══════════════════════════════════════════════════════════════╗
-# ║  CELL 12 — Trực Quan Hóa Đồ Thị & Phân Bố Gain               ║
-# ╚══════════════════════════════════════════════════════════════╝
-
-import matplotlib.pyplot as plt
-
-if 2 in all_scale_runs:
-    df_2x = pd.DataFrame([r for r in all_scale_runs[2]['records'] if r.get('status') == 'ok'])
-    if not df_2x.empty:
-        fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-
-        # 1. Histogram PSNR Gain
-        gains = df_2x['psnr_gain_db']
-        axes[0].hist(gains, bins=40, color='#1f77b4', edgecolor='black', alpha=0.7)
-        axes[0].axvline(gains.mean(), color='red', linestyle='--', linewidth=1.5, label=f"Mean: {gains.mean():.2f} dB")
-        axes[0].set_title("Phân bố PSNR Gain (Scale 2x) — Compact SRCNN RTL", fontsize=11, fontweight='bold')
-        axes[0].set_xlabel("PSNR Gain so với Bicubic (dB)")
-        axes[0].set_ylabel("Số lượng ảnh")
-        axes[0].legend()
-        axes[0].grid(alpha=0.3)
-
-        # 2. Scatter Bicubic vs RTL PSNR
-        axes[1].scatter(df_2x['psnr_bicubic_db'], df_2x['psnr_model_db'], alpha=0.3, color='#2ca02c', s=12)
-        lo = min(df_2x['psnr_bicubic_db'].min(), df_2x['psnr_model_db'].min()) - 1
-        hi = max(df_2x['psnr_bicubic_db'].max(), df_2x['psnr_model_db'].max()) + 1
-        axes[1].plot([lo, hi], [lo, hi], 'r--', label="y = x (Bicubic Baseline)")
-        axes[1].set_title("Tương Quan PSNR Bicubic vs Compact SRCNN RTL", fontsize=11, fontweight='bold')
-        axes[1].set_xlabel("PSNR Bicubic (dB)")
-        axes[1].set_ylabel("PSNR Compact SRCNN RTL (dB)")
-        axes[1].legend()
-        axes[1].grid(alpha=0.3)
-
-        plt.tight_layout()
-        plt.savefig(os.path.join(OUTPUT_DIR, "compact_srcnn_rtl_analysis_plot.png"), dpi=150)
-        plt.show()
-        print("✓ Đã vẽ và lưu biểu đồ phân tích thống kê.")
-""")
-
-# ------------------------------------------------------------------------------
-# CELL 13: Cleanup & Conclusion
-# ------------------------------------------------------------------------------
-add_code("""# ╔══════════════════════════════════════════════════════════════╗
-# ║  CELL 13 — Dọn Dẹp VRAM & Hướng Dẫn Đồng Bộ Về Local         ║
+# ║  CELL 12 — Giải Phóng VRAM & Hướng Dẫn Đồng Bộ Local         ║
 # ╚══════════════════════════════════════════════════════════════╝
 
 gc.collect()
@@ -1007,18 +964,18 @@ if DEVICE == 'cuda':
 
 print(f\"\"\"
 ══════════════════════════════════════════════════════════════════════
-🎉 HOÀN THÀNH TOÀN BỘ BENCHMARK CHO COMPACT SRCNN RTL (1-16-8-1)!
+🎉 HOÀN THÀNH TOÀN BỘ BENCHMARK CHO MÔ HÌNH COMPACT SRCNN RTL!
 ══════════════════════════════════════════════════════════════════════
 
 📥 CÁC BƯỚC TIẾP THEO:
-1. Tải file 'compact_srcnn_rtl_benchmark_results.zip' từ tab 'Output' bên phải giao diện Kaggle.
+1. Tải file '{TARGET_MODEL}_benchmark_results.zip' từ Kaggle Output.
 2. Giải nén và đặt các file vào thư mục repository:
    • legacy_experiments/benchmark_results/hardware/
-     - compact_srcnn_rtl_2x_benchmark.json
-     - compact_srcnn_rtl_3x_benchmark.json
-     - compact_srcnn_rtl_4x_benchmark.json
-     - compact_srcnn_rtl_multiscale_summary.csv
-3. Chạy script vẽ biểu đồ đối chiếu hiệu năng phần mềm vs phần cứng:
+     - {TARGET_MODEL}_2x_benchmark.json
+     - {TARGET_MODEL}_3x_benchmark.json
+     - {TARGET_MODEL}_4x_benchmark.json
+     - {TARGET_MODEL}_multiscale_summary.csv
+3. Chạy script đối chiếu hiệu năng và vẽ biểu đồ:
    python3 legacy_experiments/notebooks_kaggle/analysis/render_hardware_comparison_charts.py
 ══════════════════════════════════════════════════════════════════════
 \"\"\")
@@ -1049,11 +1006,16 @@ notebook_json = {
 # Ghi ra 2 thư mục đích
 target_repo_path = REPO_ROOT / "legacy_experiments/notebooks_kaggle/hardware/kaggle_compact_srcnn_hardware_benchmark.ipynb"
 target_downloads_path = Path("/Users/giabao/Downloads/kaggle_compact_srcnn_hardware_benchmark.ipynb")
+target_core_path = REPO_ROOT / "core_project/benchmarks_reports/pynq_z2/kaggle_compact_srcnn_hardware_benchmark.ipynb"
 
 with open(target_repo_path, "w", encoding="utf-8") as f:
     json.dump(notebook_json, f, indent=1, ensure_ascii=False)
-print(f"✓ Đã lưu notebook tại repository: {target_repo_path}")
+print(f"✓ Đã lưu notebook tại repository   : {target_repo_path}")
 
 with open(target_downloads_path, "w", encoding="utf-8") as f:
     json.dump(notebook_json, f, indent=1, ensure_ascii=False)
-print(f"✓ Đã lưu notebook tại Downloads  : {target_downloads_path}")
+print(f"✓ Đã lưu notebook tại Downloads    : {target_downloads_path}")
+
+with open(target_core_path, "w", encoding="utf-8") as f:
+    json.dump(notebook_json, f, indent=1, ensure_ascii=False)
+print(f"✓ Đã lưu notebook tại core_project : {target_core_path}")
