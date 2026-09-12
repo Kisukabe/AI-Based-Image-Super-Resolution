@@ -366,7 +366,7 @@ def create_software_cover_page() -> plt.Figure:
     fig.text(
         0.095,
         0.814,
-        "3. SRCNN Original: Kiến trúc phần mềm gốc 1 -> 64 -> 32 -> 1 (8.129 tham số, FP32) — [Đã infer hoàn tất].",
+        "3. SRCNN Original: Kiến trúc phần mềm gốc 1 -> 64 -> 32 -> 1 (8.129 tham số, FP32).",
         ha="left",
         va="top",
         fontsize=8.3,
