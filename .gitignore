@@ -55,7 +55,8 @@ code software/logs/
 code software/eval_images/
 legacy_experiments/survey_assets/sr_outputs*
 legacy_experiments/survey_assets/logs/
-legacy_experiments/survey_assets/eval_images/
+legacy_experiments/survey_assets/eval_images/*
+!legacy_experiments/survey_assets/eval_images/00001255_011.png
 
 # OS generated files (macOS & Windows)
 .DS_Store
@@ -70,5 +71,6 @@ desktop.ini
 # IDE & Editor settings
 .vscode/
 .idea/
+.vs/
 *.sublime-project
 *.sublime-workspace
