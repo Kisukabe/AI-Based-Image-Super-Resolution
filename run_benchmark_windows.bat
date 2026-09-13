@@ -13,19 +13,30 @@ echo ===========================================================================
 echo.
 
 rem Kiem tra Python
-where python >nul 2>nul
+set "PYTHON_EXE=python"
+python -c "import sys" >nul 2>nul
 if %errorlevel% neq 0 (
-    echo [LOI] Khong tim thay Python trong he thong!
-    echo Vui long cai dat Python 3.8+ tu https://www.python.org/downloads/
-    echo Chu y: Nho tich chon "Add Python to PATH" khi cai dat.
-    echo.
-    pause
-    exit /b 1
+    if exist "%USERPROFILE%\miniconda3\envs\superres\python.exe" (
+        set "PYTHON_EXE=%USERPROFILE%\miniconda3\envs\superres\python.exe"
+    ) else if exist "%USERPROFILE%\anaconda3\envs\superres\python.exe" (
+        set "PYTHON_EXE=%USERPROFILE%\anaconda3\envs\superres\python.exe"
+    ) else if exist "%LOCALAPPDATA%\miniconda3\envs\superres\python.exe" (
+        set "PYTHON_EXE=%LOCALAPPDATA%\miniconda3\envs\superres\python.exe"
+    ) else if exist "%USERPROFILE%\miniconda3\python.exe" (
+        set "PYTHON_EXE=%USERPROFILE%\miniconda3\python.exe"
+    ) else (
+        echo [LOI] Khong tim thay Python kha dung trong he thong hoac Conda!
+        echo Vui long cai dat Python 3.8+ tu https://www.python.org/downloads/
+        echo Chu y: Nho tich chon "Add Python to PATH" khi cai dat hoac kich hoat moi truong conda.
+        echo.
+        pause
+        exit /b 1
+    )
 )
 
 echo [1/3] Kiem tra phien ban Python va PyTorch...
-python -c "import sys; print(f'Python Version : {sys.version.split()[0]}')"
-python -c "
+"%PYTHON_EXE%" -c "import sys; print(f'Python Version : {sys.version.split()[0]}')"
+"%PYTHON_EXE%" -c "
 import torch
 print(f'PyTorch Version: {torch.__version__}')
 cuda_avail = torch.cuda.is_available()
@@ -42,7 +53,7 @@ if %errorlevel% neq 0 (
     echo [THONG BAO] Chua cai dat day du thu vien PyTorch / OpenCV / NumPy.
     echo Dang tu dong cai dat tu requirements.txt...
     echo.
-    pip install -r requirements.txt
+    "%PYTHON_EXE%" -m pip install -r requirements.txt
     if %errorlevel% neq 0 (
         echo [LOI] Cai dat that bai. Vui long kiem tra ket noi mang.
         pause
@@ -68,24 +79,24 @@ if "%choice%"=="0" exit /b 0
 echo.
 if "%choice%"=="1" (
     echo [THUC THI] Dang chay do toan bo thiet bi (10 warm-up, 100 loops)...
-    python benchmark_multi_platform.py --device all --iterations 100 --warmup 10 --output-dir ./results_windows
+    "%PYTHON_EXE%" benchmark_multi_platform.py --device all --iterations 100 --warmup 10 --output-dir ./results_windows
 )
 if "%choice%"=="2" (
     echo [THUC THI] Dang chay do CPU Intel/AMD (10 warm-up, 100 loops)...
-    python benchmark_multi_platform.py --device cpu --iterations 100 --warmup 10 --output-dir ./results_windows
+    "%PYTHON_EXE%" benchmark_multi_platform.py --device cpu --iterations 100 --warmup 10 --output-dir ./results_windows
 )
 if "%choice%"=="3" (
     echo [THUC THI] Dang chay do GPU NVIDIA CUDA (10 warm-up, 100 loops)...
-    python benchmark_multi_platform.py --device cuda --iterations 100 --warmup 10 --output-dir ./results_windows
+    "%PYTHON_EXE%" benchmark_multi_platform.py --device cuda --iterations 100 --warmup 10 --output-dir ./results_windows
 )
 if "%choice%"=="4" (
     echo [THUC THI] Dang kiem tra Scoreboard Bit-Exact 100%%...
-    python core_project/hardware_fpga/dv_verification/dv_scoreboard_check.py
+    "%PYTHON_EXE%" core_project/hardware_fpga/dv_verification/dv_scoreboard_check.py
 )
 if "%choice%"=="5" (
     echo [THUC THI] Dang tao Fig 7 (Overlap-Tiling Ablation) va Fig 8 (Multi-Model Visual)...
-    python generate_paper_fig7.py
-    python generate_paper_fig8.py
+    "%PYTHON_EXE%" generate_paper_fig7.py
+    "%PYTHON_EXE%" generate_paper_fig8.py
 )
 
 echo.

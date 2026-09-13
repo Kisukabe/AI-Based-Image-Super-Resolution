@@ -14,6 +14,13 @@ Mục đích:
 
 import os
 import sys
+
+if sys.platform == "win32":
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 import glob
 import json
 import time
@@ -102,7 +109,9 @@ def main():
     print("[TEST] Bắt đầu kiểm thử cục bộ Compact SRCNN RTL...")
     sample_images = sorted(glob.glob(os.path.join(REPO_ROOT, "legacy_experiments/survey_assets/eval_images/*.png")))[:5]
     if not sample_images:
-        print("[WARN] Không tìm thấy ảnh trong survey_assets/eval_images.")
+        sample_images = sorted(glob.glob(os.path.join(REPO_ROOT, "core_project/data/test_images/*.png")))[:5]
+    if not sample_images:
+        print("[WARN] Không tìm thấy ảnh trong survey_assets/eval_images hoặc core_project/data/test_images.")
         return
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'

@@ -12,17 +12,39 @@ Write-Host "====================================================================
 Write-Host ""
 
 # Kiểm tra Python
-$pythonCmd = Get-Command python -ErrorAction SilentlyContinue
-if (-not $pythonCmd) {
-    Write-Host "[LỖI] Không tìm thấy Python trong PATH!" -ForegroundColor Red
-    Write-Host "Vui lòng cài đặt Python 3.8+ từ https://www.python.org/downloads/ và tích chọn 'Add to PATH'."
+$pythonExe = "python"
+$hasWorkingPython = $false
+try {
+    $null = & python -c "import sys" 2>$null
+    if ($LASTEXITCODE -eq 0) { $hasWorkingPython = $true }
+} catch {}
+
+if (-not $hasWorkingPython) {
+    $candidates = @(
+        "$env:USERPROFILE\miniconda3\envs\superres\python.exe",
+        "$env:USERPROFILE\anaconda3\envs\superres\python.exe",
+        "$env:LOCALAPPDATA\miniconda3\envs\superres\python.exe",
+        "$env:USERPROFILE\miniconda3\python.exe"
+    )
+    foreach ($cand in $candidates) {
+        if (Test-Path $cand) {
+            $pythonExe = $cand
+            $hasWorkingPython = $true
+            break
+        }
+    }
+}
+
+if (-not $hasWorkingPython) {
+    Write-Host "[LỖI] Không tìm thấy Python khả dụng trong PATH hoặc Conda!" -ForegroundColor Red
+    Write-Host "Vui lòng cài đặt Python 3.8+ từ https://www.python.org/downloads/ hoặc kích hoạt môi trường conda."
     Read-Host "Nhấn Enter để thoát..."
     exit 1
 }
 
 # Kiểm tra PyTorch và CUDA
 Write-Host "[1/3] Kiểm tra thông tin môi trường..." -ForegroundColor Yellow
-python -c @"
+& $pythonExe -c @"
 import sys, torch
 print(f'Python Version : {sys.version.split()[0]}')
 print(f'PyTorch Version: {torch.__version__}')
@@ -37,7 +59,7 @@ print(f'Intel MKL DNN  : {mkl_avail}')
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "`n[THÔNG BÁO] Chưa cài đủ thư viện. Đang cài đặt từ requirements.txt..." -ForegroundColor Yellow
-    pip install -r requirements.txt
+    & $pythonExe -m pip install -r requirements.txt
 }
 
 Write-Host ""
@@ -60,24 +82,24 @@ $outDir = "./results_windows"
 switch ($choice) {
     "1" {
         Write-Host "`n[THỰC THI] Đang chạy đo toàn bộ thiết bị (10 warm-up, 100 loops)..." -ForegroundColor Green
-        python benchmark_multi_platform.py --device all --iterations 100 --warmup 10 --output-dir $outDir
+        & $pythonExe benchmark_multi_platform.py --device all --iterations 100 --warmup 10 --output-dir $outDir
     }
     "2" {
         Write-Host "`n[THỰC THI] Đang chạy đo CPU Intel/AMD..." -ForegroundColor Green
-        python benchmark_multi_platform.py --device cpu --iterations 100 --warmup 10 --output-dir $outDir
+        & $pythonExe benchmark_multi_platform.py --device cpu --iterations 100 --warmup 10 --output-dir $outDir
     }
     "3" {
         Write-Host "`n[THỰC THI] Đang chạy đo GPU NVIDIA CUDA..." -ForegroundColor Green
-        python benchmark_multi_platform.py --device cuda --iterations 100 --warmup 10 --output-dir $outDir
+        & $pythonExe benchmark_multi_platform.py --device cuda --iterations 100 --warmup 10 --output-dir $outDir
     }
     "4" {
         Write-Host "`n[THỰC THI] Đang kiểm tra Scoreboard Bit-Exact 100%..." -ForegroundColor Green
-        python core_project/hardware_fpga/dv_verification/dv_scoreboard_check.py
+        & $pythonExe core_project/hardware_fpga/dv_verification/dv_scoreboard_check.py
     }
     "5" {
         Write-Host "`n[THỰC THI] Đang tạo hình Fig 7 và Fig 8 chuẩn 300 DPI..." -ForegroundColor Green
-        python generate_paper_fig7.py
-        python generate_paper_fig8.py
+        & $pythonExe generate_paper_fig7.py
+        & $pythonExe generate_paper_fig8.py
     }
 }
 
