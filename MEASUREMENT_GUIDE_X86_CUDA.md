@@ -14,3 +14,8 @@ python benchmark_multi_platform.py --device cuda --iterations 100 --warmup 10
 # Chỉ đo CPU x86 (MKL-DNN)
 python benchmark_multi_platform.py --device cpu --iterations 100 --warmup 10
 ```
+
+### Dành riêng cho Windows (1-Click Run):
+* Nhấp đúp chuột vào file **`run_benchmark_windows.bat`** (tự động kiểm tra Python, cài đặt thư viện và hiển thị menu đo đạc).
+* Hoặc chạy script PowerShell: `.\run_benchmark_windows.ps1`
+* Xem hướng dẫn chi tiết từng bước tại: [HUONG_DAN_CHAY_WINDOWS.md](file:///Users/giabao/Desktop/GitHub/AI-Based-Image-Super-Resolution/HUONG_DAN_CHAY_WINDOWS.md)

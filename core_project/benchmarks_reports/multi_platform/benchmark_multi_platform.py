@@ -181,6 +181,25 @@ class PlatformDetector:
                             return line.split(":")[1].strip()
             except Exception:
                 pass
+        elif system == "Windows":
+            try:
+                cmd = ["wmic", "cpu", "get", "name"]
+                out = subprocess.check_output(cmd, stderr=subprocess.DEVNULL).decode(errors="ignore").strip()
+                lines = [line.strip() for line in out.split("\n") if line.strip() and "Name" not in line]
+                if lines:
+                    return f"{lines[0]} ({machine})"
+            except Exception:
+                pass
+            try:
+                cmd = ["powershell", "-NoProfile", "-Command", "(Get-CimInstance Win32_Processor).Name"]
+                out = subprocess.check_output(cmd, stderr=subprocess.DEVNULL).decode(errors="ignore").strip()
+                if out:
+                    return f"{out} ({machine})"
+            except Exception:
+                pass
+            ident = os.environ.get("PROCESSOR_IDENTIFIER")
+            if ident:
+                return f"{ident} ({machine})"
         return f"{platform.processor()} ({machine})"
 
     @staticmethod
