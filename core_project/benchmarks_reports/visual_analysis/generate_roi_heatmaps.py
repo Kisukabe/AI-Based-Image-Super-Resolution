@@ -40,6 +40,11 @@ from PIL import Image
 from skimage.metrics import peak_signal_noise_ratio as compute_psnr
 from skimage.metrics import structural_similarity as compute_ssim
 
+# Add repository root to sys.path
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 # Import Bit-Accurate Golden Model từ hardware_fpga
 from core_project.hardware_fpga.dv_verification.golden_model import (
     CompactSRCNN_GoldenModel,

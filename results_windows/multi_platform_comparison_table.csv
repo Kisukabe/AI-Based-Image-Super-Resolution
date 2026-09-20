@@ -1,4 +1,0 @@
-Platform,DeviceType,DataType,ConvLatencyMean_ms,ConvLatencyStd_ms,E2ELatencyMean_ms,E2ELatencyStd_ms,Power_W,Throughput_FPS,Efficiency_FPS_per_Watt,Source
-Xilinx PYNQ-Z2 (Zynq-7020 SoC),FPGA RTL IP Core (Fixed-Point),S7.0 / S0.7 / S24.7,421.2,0.45,444.19,0.52,1.438,2.251,1.5646,Board Hardware Measurement (Physical Oscilloscope / Vivado Power Analyzer)
-NVIDIA GeForce RTX 4060 Ti (16.0 GB VRAM; CUDA 12.1),NVIDIA CUDA GPU (PyTorch Float32),Float32,3.203,0.037,4.802,0.149,12.542,208.257,16.6048,Host Live Measurement (time.perf_counter_ns)
-13th Gen Intel(R) Core(TM) i7-13700K (AMD64),CPU (PyTorch Float32),Float32,77.288,3.789,80.368,3.884,65.0,12.443,0.1914,Host Live Measurement (time.perf_counter_ns)

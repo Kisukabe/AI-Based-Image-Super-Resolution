@@ -10,7 +10,7 @@
     stroke: (x, y) => if y == 0 { (bottom: 1.5pt + brand-accent) } else { 0.5pt + border-color },
     table.header([*Mã*], [*Sản phẩm bàn giao*], [*File lưu trữ*], [*Trạng thái*]),
     [D1.1], [Checkpoint PyTorch Compact SRCNN Float32 (1.649 tham số)], [`core_project/ai_software/checkpoints/compact_srcnn_float32.pth`], [#badge-pass([ĐÃ HOÀN THÀNH])],
-    [D1.2], [Script tạo tập dữ liệu suy thoái vật lý y tế], [`generate_degraded_dataset.py`], [#badge-pass([ĐÃ HOÀN THÀNH])],
+    [D1.2], [Script tạo tập dữ liệu suy thoái vật lý y tế], [`core_project/ai_software/pipeline/generate_degraded_dataset.py`], [#badge-pass([ĐÃ HOÀN THÀNH])],
     [D1.3], [Script đánh giá mô hình baseline trên tập test], [`core_project/ai_software/evaluation/evaluate_pytorch_baseline.py`], [#badge-pass([ĐÃ HOÀN THÀNH])],
     [D1.4], [File ảnh đồ thị hội tụ hàm Loss (300 DPI, 4200x1500)], [`core_project/ai_software/training/loss_convergence_dpi300.png`], [#badge-pass([ĐÃ HOÀN THÀNH])],
     [D1.5], [Bảng số liệu đối chứng PSNR/SSIM (Excel 4 Sheet, CSV, JSON)], [`core_project/benchmarks_reports/deliverables_export/baseline_psnr_ssim_comparison.xlsx`], [#badge-pass([ĐÃ HOÀN THÀNH])]

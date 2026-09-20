@@ -6,28 +6,63 @@ Dự án nghiên cứu giải pháp Siêu phân giải ảnh y tế (MRI / X-qua
 
 ## 1. Bản Đồ Phân Loại Thư Mục (Directory Layout)
 
-Kho mã nguồn được cấu trúc tường minh thành 2 phân hệ độc lập:
+Kho mã nguồn được cấu trúc tường minh và chuẩn hóa theo tiêu chuẩn kỹ thuật:
 
 ```text
 AI-Based-Image-Super-Resolution/
-├── requirements/                            # Tài liệu nhiệm vụ gốc & Lộ trình thực hiện
-│   ├── Request1.txt                         # Nhiệm vụ 1: AI Modeling & Software Baseline
-│   ├── Request2.txt                         # Nhiệm vụ 2: Bit-Accurate DV & Hardware Benchmark
-│   └── TASK_ROADMAP.md                      # Lộ trình 12 bước chi tiết (Available & Missing)
+├── .agents/                                # Memory & quy tắc hệ thống
+├── .gitignore
+├── AGENTS.md                               # Workspace memory & chỉ dẫn CTO
+├── README.md                               # Giới thiệu dự án chuẩn báo cáo khoa học
+├── build_pdf.sh                            # Script 1 bước biên dịch báo cáo Typst -> PDF
+├── requirements.txt                        # Danh mục thư viện Python
+├── environment.yml                         # Cấu hình môi trường Conda
 │
-├── core_project/                            # [DỰ ÁN CHÍNH]: Compact SRCNN trên PYNQ-Z2 & Baseline y tế
-│   ├── README.md                            # Tổng quan chi tiết dự án chính
-│   ├── data/                                # Dữ liệu ảnh y tế (338 cặp ảnh LR/HR đã niêm phong)
-│   ├── ai_software/                         # AI Modeling, Loss function, Dataset pipeline
-│   ├── hardware_fpga/                       # RTL Verilog, Trọng số phần cứng Q7 hex, Testbench
-│   └── benchmarks_reports/                  # Kết quả đo đạc PYNQ-Z2, CPU/GPU, ROI Zoom-in
+├── core_project/                           # [CORE] Mã nguồn cốt lõi (Bảo toàn 100%)
+│   ├── ai_software/                        # PyTorch models, training, evaluation, checkpoints
+│   ├── hardware_fpga/                      # Verilog RTL, sim testbench, weights fixed-point, DV check
+│   ├── benchmarks_reports/                 # PYNQ-Z2 logs, multi-platform logs, deliverables excel
+│   └── data/                               # Dataset ảnh test y tế (HR 1024x1024, LR 512x512)
 │
-└── legacy_experiments/                      # [KHẢO SÁT CŨ TRÊN KAGGLE]: Lưu trữ độc lập 6 mô hình RGB
-    ├── README.md                            # Hướng dẫn chi tiết phân hệ khảo sát cũ
-    ├── weight_models_rgb/                   # File trọng số .pth 3 kênh màu (VDSR, EDSR, ESPCN, FSRCNN, SRGAN, SRCNN 69k)
-    ├── notebooks_kaggle/                    # Toàn bộ Jupyter Notebooks chạy trên Kaggle
-    ├── benchmark_results/                   # Kết quả JSON & CSV cũ từ Kaggle
-    └── survey_assets/                       # Dữ liệu ảnh mẫu, báo cáo khảo sát cũ
+├── requirements/                           # [REPORTS] Hồ sơ yêu cầu & Báo cáo kỹ thuật xuất bản
+│   ├── Request1.txt                        # Đặc tả Nhiệm vụ 1
+│   ├── Request2.txt                        # Đặc tả Nhiệm vụ 2
+│   ├── TASK_ROADMAP.md                     # Ma trận tiến độ 12 hạng mục
+│   ├── BAO_CAO_NHIEM_VU.pdf                # Báo cáo xuất bản chính thức (PDF 3 trang)
+│   ├── BAO_CAO_NHIEM_VU.typ                # File master Typst
+│   ├── BAO_CAO_NHIEM_VU.md                 # Bản sao lưu Markdown
+│   └── report_pages/                       # Các module Typst theo từng trang
+│       ├── style_config.typ
+│       ├── trang_1.typ
+│       ├── trang_2.typ
+│       └── trang_3.typ
+│
+├── figures/                                # [FIGURES] Thư viện hình ảnh độ phân giải cao 300 DPI
+│   ├── fig7_boundary_ablation.png          # Fig 7 Bài báo IEEE (Overlap-Tiling Ablation)
+│   ├── fig8_visual_comparison.png          # Fig 8 Bài báo IEEE (So sánh định tính 2 hàng x 7 mô hình)
+│   ├── loss_convergence_dpi300.png         # Đồ thị hội tụ hàm mất mát Loss
+│   ├── hist_*.png                          # Bộ biểu đồ Histogram phân bố xác suất PSNR/SSIM
+│   └── visual_samples/                     # Ảnh so sánh ROI và heatmap sai số dư tuyệt đối
+│
+├── docs/                                   # [DOCS] Tài liệu kỹ thuật phụ trợ
+│   ├── Git_GitHub_Tutorial_Co_Ban_macOS_Windows.md
+│   └── MEASUREMENT_GUIDE_X86_CUDA.md
+│
+├── scripts/                                # [SCRIPTS] Các script điều phối công cụ
+│   ├── run_generate_paper_figures.py       # Tái tạo Fig 7 & Fig 8 chuẩn 300 DPI
+│   ├── run_dv_verification.py              # Chạy bộ kiểm chứng vi mạch Bit-Accurate DV
+│   ├── run_multi_platform_benchmark.py     # Đo đạc hiệu năng CPU/GPU/FPGA
+│   └── run_statistical_analysis.py         # Phân tích thống kê 2.200 ảnh PYNQ-Z2
+│
+├── legacy_experiments/                     # [ARCHIVE] Thử nghiệm cũ & các mô hình RGB
+│   ├── benchmark_results/
+│   ├── notebooks_kaggle/
+│   ├── survey_assets/
+│   ├── utility_scripts/
+│   └── weight_models_rgb/
+│
+└── Medical_SR_hardware_paper/              # [PAPER] Bản thảo bài báo khoa học IEEE (GTSD 2026)
+    └── GTSD2026-193-IEEE/
 ```
 
 ---
@@ -42,13 +77,24 @@ AI-Based-Image-Super-Resolution/
 
 ---
 
-## 3. Tính Tương Thích Ngược (Symlinks)
+## 3. Lệnh Thực Thi Nhanh (Quick Start)
 
-Các liên kết mềm được duy trì tại thư mục gốc để tương thích với các lệnh và script trước đây:
-- `code hardware` -> `core_project/hardware_fpga`
-- `code software` -> `core_project/ai_software`
-- `data` -> `core_project/data`
-- `models` -> `legacy_experiments/weight_models_rgb`
-- `results` -> `legacy_experiments/benchmark_results`
-- `notebooks` -> `legacy_experiments/notebooks_kaggle`
-- `generate_degraded_dataset.py` -> `core_project/ai_software/pipeline/generate_degraded_dataset.py`
+### Xuất bản báo cáo kỹ thuật PDF
+```bash
+./build_pdf.sh         # Xuất requirements/BAO_CAO_NHIEM_VU.pdf (3 trang chuẩn)
+./build_pdf.sh 1       # Xuất riêng Trang 1 (PDF + ảnh PNG để xem trước)
+./build_pdf.sh watch   # Tự động cập nhật PDF tức thì khi bấm Cmd+S (< 0.03s)
+```
+
+### Chạy kiểm chứng vi mạch Bit-Accurate DV Scoreboard
+```bash
+python3 scripts/run_dv_verification.py --scenario functional   # Kịch bản 1: Functional 4x4
+python3 scripts/run_dv_verification.py --scenario patch        # Kịch bản 2: Full patch 128x128
+python3 scripts/run_dv_verification.py --scenario testset      # Kịch bản 3: Full ảnh y tế 1024x1024
+python3 scripts/run_dv_verification.py --scenario all          # Chạy toàn bộ 4/4 kịch bản ALL_PASS
+```
+
+### Sinh trọn bộ hình ảnh bài báo IEEE (300 DPI)
+```bash
+python3 scripts/run_generate_paper_figures.py
+```

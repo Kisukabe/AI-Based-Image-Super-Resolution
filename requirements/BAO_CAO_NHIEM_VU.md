@@ -47,7 +47,7 @@
 | Mã | Sản phẩm bàn giao | File lưu trữ | Trạng thái |
 | :---: | :--- | :--- | :---: |
 | D1.1 | Checkpoint PyTorch Compact SRCNN Float32 (1.649 tham số) | `core_project/ai_software/checkpoints/compact_srcnn_float32.pth` | ĐÃ HOÀN THÀNH |
-| D1.2 | Script tạo tập dữ liệu suy thoái vật lý y tế | `generate_degraded_dataset.py` | ĐÃ HOÀN THÀNH |
+| D1.2 | Script tạo tập dữ liệu suy thoái vật lý y tế | `core_project/ai_software/pipeline/generate_degraded_dataset.py` | ĐÃ HOÀN THÀNH |
 | D1.3 | Script đánh giá mô hình baseline trên tập test | `core_project/ai_software/evaluation/evaluate_pytorch_baseline.py` | ĐÃ HOÀN THÀNH |
 | D1.4 | File ảnh đồ thị hội tụ hàm Loss (300 DPI, 4200x1500) | `core_project/ai_software/training/loss_convergence_dpi300.png` | ĐÃ HOÀN THÀNH |
 | D1.5 | Bảng số liệu đối chứng PSNR/SSIM (Excel 4 Sheet, CSV, JSON) | `core_project/benchmarks_reports/deliverables_export/baseline_psnr_ssim_comparison.xlsx` | ĐÃ HOÀN THÀNH |
@@ -104,18 +104,18 @@
 - Nhận xét kỹ thuật: Lõi phần cứng FPGA tiêu thụ công suất cực thấp (1.438 W), đạt hiệu quả năng lượng 1.56 FPS/W tương đương GPU chuyên dụng trung tâm dữ liệu (1.54 FPS/W), vượt trội hoàn toàn so với kiến trúc x86 truyền thống (0.49 FPS/W).
 
 ### 4. Xuất hình ảnh minh họa trực quan phục vụ bài báo IEEE
-- Đã hoàn thiện script `generate_roi_heatmaps.py` trích xuất 5 vùng quan tâm (ROI 128x128 zoom 4x) cùng bản đồ nhiệt sai số dư tuyệt đối `|I_SR - I_HR|` chuẩn 300 DPI tại `figures_dpi300/visual_samples/`.
-- **Fig. 7 Bài báo IEEE**: Triển khai script `generate_paper_fig7.py` tạo hình Overlap-Tiling Boundary Ablation so sánh đối chứng giữa ghép mảnh không đệm (S=128, M=0, xuất hiện vệt lưới viền) và ghép mảnh đệm biên (S=112, M=8, loại bỏ 100% hiện tượng viền khối). File: `figures_dpi300/fig7_boundary_ablation.png` (300 DPI, 4769x1685 px).
-- **Fig. 8 Bài báo IEEE**: Triển khai script `generate_paper_fig8.py` tạo ma trận so sánh định tính 2 hàng ROI x 7 mô hình kèm nhãn định lượng PSNR / SSIM / LPIPS. File: `figures_dpi300/fig8_visual_comparison.png` (300 DPI, 4710x1415 px).
+- Đã hoàn thiện script `core_project/benchmarks_reports/visual_analysis/generate_roi_heatmaps.py` trích xuất 5 vùng quan tâm (ROI 128x128 zoom 4x) cùng bản đồ nhiệt sai số dư tuyệt đối `|I_SR - I_HR|` chuẩn 300 DPI tại `figures/visual_samples/`.
+- **Fig. 7 Bài báo IEEE**: Triển khai script `generate_paper_fig7.py` tạo hình Overlap-Tiling Boundary Ablation so sánh đối chứng giữa ghép mảnh không đệm (S=128, M=0, xuất hiện vệt lưới viền) và ghép mảnh đệm biên (S=112, M=8, loại bỏ 100% hiện tượng viền khối). File: `figures/fig7_boundary_ablation.png` (300 DPI, 4769x1685 px).
+- **Fig. 8 Bài báo IEEE**: Triển khai script `generate_paper_fig8.py` tạo ma trận so sánh định tính 2 hàng ROI x 7 mô hình kèm nhãn định lượng PSNR / SSIM / LPIPS. File: `figures/fig8_visual_comparison.png` (300 DPI, 4710x1415 px).
 
 ### 5. Bảng sản phẩm bàn giao Nhiệm vụ 2
 | Mã | Sản phẩm bàn giao | File lưu trữ | Trạng thái |
 | :---: | :--- | :--- | :---: |
 | D2.1 | Notebook Kaggle Benchmark Compact SRCNN RTL (13 cell, 3 scale 2x/3x/4x) | `legacy_experiments/notebooks_kaggle/hardware/kaggle_compact_srcnn_hardware_benchmark.ipynb` | ĐÃ HOÀN THÀNH |
-| D2.2 | Script phân tích JSON và bộ biểu đồ Histogram (300 DPI) | `analyze_kaggle_benchmark.py`, `figures_dpi300/hist_*.png` | ĐÃ HOÀN THÀNH |
+| D2.2 | Script phân tích JSON và bộ biểu đồ Histogram (300 DPI) | `core_project/benchmarks_reports/pynq_z2/analyze_kaggle_benchmark.py`, `figures/hist_*.png` | ĐÃ HOÀN THÀNH |
 | D2.3 | Script kiểm thử Bit-Exact DV Scoreboard (4/4 kịch bản ALL_PASS) | `core_project/hardware_fpga/dv_verification/dv_scoreboard_check.py` | ĐÃ HOÀN THÀNH |
-| D2.4 | Bảng Excel thống kê 2.200 ảnh và đo đạc thực nghiệm đa nền tảng (6 Sheet) | `hardware_benchmark_statistics.xlsx` | ĐÃ HOÀN THÀNH |
-| D2.5 | Thư mục 29 hình ảnh độ phân giải cao 300 DPI (Histogram, ROI, Heatmap) | `figures_dpi300/` | ĐÃ HOÀN THÀNH |
+| D2.4 | Bảng Excel thống kê 2.200 ảnh và đo đạc thực nghiệm đa nền tảng (6 Sheet) | `core_project/benchmarks_reports/deliverables_export/hardware_benchmark_statistics.xlsx` | ĐÃ HOÀN THÀNH |
+| D2.5 | Thư mục 29 hình ảnh độ phân giải cao 300 DPI (Histogram, ROI, Heatmap) | `figures/` | ĐÃ HOÀN THÀNH |
 | D2.6 | Báo cáo so sánh 8 mô hình siêu phân giải song ngữ VN/EN (2 bản PDF) | `performance_comparison_report.pdf`, `performance_comparison_report_en.pdf` | ĐÃ HOÀN THÀNH |
-| D2.7 | Hình Fig. 7 Bài báo IEEE: Overlap-Tiling Boundary Ablation (300 DPI) | `figures_dpi300/fig7_boundary_ablation.png` | ĐÃ HOÀN THÀNH |
-| D2.8 | Hình Fig. 8 Bài báo IEEE: Ma trận so sánh định tính 2 hàng x 7 mô hình (300 DPI) | `figures_dpi300/fig8_visual_comparison.png` | ĐÃ HOÀN THÀNH |
+| D2.7 | Hình Fig. 7 Bài báo IEEE: Overlap-Tiling Boundary Ablation (300 DPI) | `figures/fig7_boundary_ablation.png` | ĐÃ HOÀN THÀNH |
+| D2.8 | Hình Fig. 8 Bài báo IEEE: Ma trận so sánh định tính 2 hàng x 7 mô hình (300 DPI) | `figures/fig8_visual_comparison.png` | ĐÃ HOÀN THÀNH |
