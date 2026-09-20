@@ -1,4 +1,4 @@
-# BÁO CÁO KẾT QUẢ THỰC HIỆN: NHIỆM VỤ 1 VÀ NHIỆM VỤ 2
+# BÁO CÁO NHIỆM VỤ
 # Dự án: AI-Based Medical Image Super-Resolution — Tăng tốc phần cứng FPGA trên Xilinx Zynq-7020 (PYNQ-Z2)
 # Cập nhật: 2026-09-20
 
