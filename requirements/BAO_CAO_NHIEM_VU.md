@@ -1,6 +1,5 @@
 # BÁO CÁO NHIỆM VỤ
 # Dự án: AI-Based Medical Image Super-Resolution — Tăng tốc phần cứng FPGA trên Xilinx Zynq-7020 (PYNQ-Z2)
-# Cập nhật: 2026-09-20
 
 ---
 
@@ -117,11 +116,3 @@
 | D2.7 | Hình Fig. 7 Bài báo IEEE: Overlap-Tiling Boundary Ablation (300 DPI) | `figures_dpi300/fig7_boundary_ablation.png` | ĐÃ HOÀN THÀNH |
 | D2.8 | Hình Fig. 8 Bài báo IEEE: Ma trận so sánh định tính 2 hàng x 7 mô hình (300 DPI) | `figures_dpi300/fig8_visual_comparison.png` | ĐÃ HOÀN THÀNH |
 
----
-
-# TỔNG HỢP TIẾN ĐỘ DỰ ÁN
-- Toàn bộ **13/13 sản phẩm bàn giao** của Nhiệm vụ 1 và Nhiệm vụ 2 đã hoàn thành 100%.
-- Tất cả các script kiểm thử độc lập, Golden Model, benchmark đa nền tảng và tài sản đồ họa 300 DPI đều đã được nghiệm thu và đồng bộ trên nhánh `main` của repository.
-
----
-*Báo cáo được khởi tạo tự động bởi Antigravity IDE — 2026-09-20.*
