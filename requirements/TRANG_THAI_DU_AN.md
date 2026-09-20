@@ -81,10 +81,12 @@ torchvision>=0.13.0
 numpy>=1.21.0
 opencv-python>=4.5.0
 scipy>=1.7.0
+scikit-image>=0.19.0
 matplotlib>=3.5.0
 pandas>=1.3.0
 openpyxl>=3.0.0
 Pillow>=9.0.0
+tqdm>=4.64.0
 ```
 
 Kết luận: Đầy đủ, có ràng buộc phiên bản tối thiểu rõ ràng.
@@ -123,78 +125,16 @@ Phân tích so sánh:
 | numpy | >=1.21.0 | (không ràng buộc) |
 | opencv-python | >=4.5.0 | (không ràng buộc) |
 | scipy | >=1.7.0 | **THIẾU** |
+| scikit-image | >=0.19.0 | **THIẾU** |
 | matplotlib | >=3.5.0 | **THIẾU** |
 | pandas | >=1.3.0 | (không ràng buộc) |
 | openpyxl | >=3.0.0 | **THIẾU** |
 | Pillow | >=9.0.0 | (không ràng buộc) |
-| tqdm | Không có | Có (không bắt buộc) |
+| tqdm | >=4.64.0 | Có (không ràng buộc) |
 
 Khuyến nghị: KHÔNG dùng file legacy để cài đặt môi trường. Chỉ dùng `requirements.txt` ở root.
 File legacy được giữ nguyên để tra lại lịch sử giai đoạn khảo sát ban đầu.
 
 ---
 
-## 5. KIỂM TRA MÔ HÌNH (MODEL AUDIT)
-
-File định nghĩa: `core_project/ai_software/models/models_srcnn.py` (251 dòng, 9.669 byte)
-
-| Class | Kiến trúc | Số params | Vai trò | Trạng thái |
-| :--- | :--- | :---: | :--- | :---: |
-| `SRCNN_Original` | 1→64→32→1 (k9,k1,k5) | 8.129 | Baseline so sánh (software) | [GIỮ LẠI] |
-| `Compact_SRCNN` | 1→16→8→1 (k9,k1,k5) | 1.649 | Mô hình chính khớp 100% RTL FPGA | [GIỮ LẠI] |
-
-Kết luận: File `models_srcnn.py` chỉ chứa đúng 2 class trên + 1 hàm tiện ích `get_model_summary()`.
-Không còn mô hình dư thừa. Yêu cầu "chỉ giữ lại SRCNN gốc và Compact SRCNN" đã được thỏa mãn.
-
----
-
-## 6. HỖ TRỢ WINDOWS
-
-| File | Mục đích | Commit |
-| :--- | :--- | :--- |
-| `run_benchmark_windows.bat` | 1-click batch script (Command Prompt) | 73fb54c |
-| `run_benchmark_windows.ps1` | PowerShell script (có elevation check) | 73fb54c |
-| `HUONG_DAN_CHAY_WINDOWS.md` | Hướng dẫn cài đặt Python, CUDA và chạy | 73fb54c |
-| `MEASUREMENT_GUIDE_X86_CUDA.md` | Hướng dẫn đo đạc thực nghiệm x86/CUDA | 0102647 |
-
----
-
-## 7. LỊCH SỬ GIT (16 COMMIT GẦN NHẤT)
-
-```
-78d24ef  docs(status): add project status report with full task checklist, requirements audit, model audit
-085c931  docs(benchmark): add windows benchmark results and exported task report pdf
-1412464  feat(notebook): add editable task report notebook with pdf export capability
-5e404d1  docs(report): export comprehensive task progress and benchmark report
-cd5b556  fix(windows): support automatic conda detection and fix utf-8 console output
-19b2f1d  fix(git): update .gitignore — whitelist eval image 00001255_011, add .vs/
-73fb54c  feat(windows): 1-click windows scripts, requirements.txt, setup guide
-fd239dd  docs(roadmap): record completion of Fig 7 and Fig 8 publication assets
-cc97c7a  feat(visual): multi-model visual comparison generator, Fig 8 (300 DPI)
-5d2b2ff  feat(visual): overlap-tiling ablation generator, Fig 7 (300 DPI)
-a7260ae  feat(deliverables): master Excel workbook, 300 DPI figures (T2.6)
-1796832  feat(visual): ROI zoom-in 4x, residual error heatmaps (T2.5)
-0102647  feat(benchmark): multi-platform benchmark script, results (T2.4)
-3a636fb  feat(benchmark): statistical analysis 2,200 images, histograms (T2.3)
-9ce2ebc  feat(analysis): generate English edition of performance report
-d5e9689  refactor(analysis): move channel numbers to footnotes
-```
-
----
-
-## 8. HẠNG MỤC CÒN LẠI / VIỆC TÙY CHỌN
-
-> Theo TASK_ROADMAP.md: toàn bộ **12/12 task đã HOÀN THÀNH**.
-> Git: HEAD = origin/main, working tree sạch.
-
-Các hạng mục tùy chọn (không bắt buộc) có thể thực hiện thêm:
-
-| Ưu tiên | Hạng mục | Ghi chú |
-| :---: | :--- | :--- |
-| THẤP | Chạy Notebook Kaggle trên GPU để lấy file ZIP kết quả thực tế PYNQ-Z2 | Cần upload lên Kaggle GPU, chạy ~20 phút |
-| THẤP | Thêm `tqdm` vào root `requirements.txt` | Tiện ích, không bắt buộc |
-| THẤP | Thêm `scikit-image` vào `requirements.txt` | Tính SSIM chính xác hơn |
-
----
-
-*Tạo tự động bởi Antigravity IDE — 2026-09-20T15:37:00+07:00*
+*Tạo tự động bởi Antigravity IDE — 2026-09-20*
