@@ -41,6 +41,8 @@
 - Đã xuất đồ thị hội tụ hàm Loss qua các epoch chuẩn xuất bản 300 DPI (kích thước 4200x1500 px): `core_project/ai_software/training/loss_convergence_dpi300.png`.
 - Đã tổng hợp bảng số liệu so sánh 3 mức (Bicubic vs SRCNN gốc vs Compact SRCNN) thành file Excel 4 sheet `baseline_psnr_ssim_comparison.xlsx` cùng các bản xuất CSV và JSON chi tiết.
 
+---
+
 ### 4. Bảng sản phẩm bàn giao Nhiệm vụ 1
 | Mã | Sản phẩm bàn giao | File lưu trữ | Trạng thái |
 | :---: | :--- | :--- | :---: |
@@ -84,6 +86,8 @@
   - **Kịch bản 3** (Ảnh y tế thực tế 1024x1024, 1.048.576 điểm ảnh): Khớp bit 100.00%, MAE = 0.0000 LSB, Max Delta = 0, Overflow = False -> PASS. Xác nhận sai số tuyệt đối `|I_FPGA - I_Golden| == 0` trên 100% điểm ảnh.
   - **Kịch bản 4** (Fault Injection Sensitivity): Bơm 5 lỗi +1 LSB nhân tạo, bắt chính xác 5/5 lỗi (đạt độ nhạy phát hiện lỗi 100.00%) -> PASS.
 
+---
+
 ### 3. Đo đạc thực nghiệm hiệu năng đa nền tảng (CPU vs GPU vs FPGA)
 - Đã hoàn thiện script đo đạc `benchmark_multi_platform.py` thực hiện chu trình End-to-End (Bicubic 2x + Conv + Save kết quả).
 - Phương pháp đo chuẩn mực: 10 lần chạy warm-up để ổn định bộ nhớ đệm, sau đó lấy giá trị Mean ± Std qua 100 lần lặp độc lập.
@@ -115,4 +119,3 @@
 | D2.6 | Báo cáo so sánh 8 mô hình siêu phân giải song ngữ VN/EN (2 bản PDF) | `performance_comparison_report.pdf`, `performance_comparison_report_en.pdf` | ĐÃ HOÀN THÀNH |
 | D2.7 | Hình Fig. 7 Bài báo IEEE: Overlap-Tiling Boundary Ablation (300 DPI) | `figures_dpi300/fig7_boundary_ablation.png` | ĐÃ HOÀN THÀNH |
 | D2.8 | Hình Fig. 8 Bài báo IEEE: Ma trận so sánh định tính 2 hàng x 7 mô hình (300 DPI) | `figures_dpi300/fig8_visual_comparison.png` | ĐÃ HOÀN THÀNH |
-

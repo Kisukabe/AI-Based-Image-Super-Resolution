@@ -68,7 +68,13 @@ ehthumbs.db
 Thumbs.db
 desktop.ini
 
-# IDE & Editor settings
+# IDE / Antigravity
+.agents/
+.gemini/
+
+# Temporary report preview files
+requirements/report_pages/*.png
+requirements/report_pages/trang_*.pdf
 .vscode/
 .idea/
 .vs/
