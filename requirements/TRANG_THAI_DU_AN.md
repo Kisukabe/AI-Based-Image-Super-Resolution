@@ -1,79 +1,79 @@
-# BAO CAO TRANG THAI DU AN
-# AI-Based Medical Image Super-Resolution — FPGA Acceleration on PYNQ-Z2
-# Cap nhat: 2026-09-20
+# BÁO CÁO TRẠNG THÁI DỰ ÁN
+# AI-Based Medical Image Super-Resolution — Tăng tốc FPGA trên PYNQ-Z2
+# Cập nhật: 2026-09-20
 
 ---
 
-## 1. TOM TAT TONG QUAN
+## 1. TÓM TẮT TỔNG QUAN
 
-| Hang muc | So lieu |
+| Hạng mục | Số liệu |
 | :--- | :---: |
-| Tong so task trong Roadmap | 12 |
-| Da hoan thanh | 12 |
-| Chua hoan thanh | 0 |
-| Tien do tong the | 100% |
-| Commit hien tai | `19b2f1d` (HEAD = origin/main) |
-| Nhanh | `main` (sach, khong co uncommitted changes) |
+| Tổng số task trong Roadmap | 12 |
+| Đã hoàn thành | 12 |
+| Chưa hoàn thành | 0 |
+| Tiến độ tổng thể | 100% |
+| Commit hiện tại | `78d24ef` (HEAD = origin/main) |
+| Nhánh | `main` (sạch, không có uncommitted changes) |
 
 ---
 
-## 2. TRANG THAI CHI TIET TUNG TASK
+## 2. TRẠNG THÁI CHI TIẾT TỪNG TASK
 
-### NHIEM VU 1 — AI Modeling, Data Degradation & Software Baseline
+### NHIỆM VỤ 1 — AI Modeling, Data Degradation & Software Baseline
 
-| STT | Ma task | Mo ta | Trang thai | File chinh |
+| STT | Mã task | Mô tả | Trạng thái | File chính |
 | :---: | :---: | :--- | :---: | :--- |
-| 1 | T1.1 | Xay dung 2 kien truc PyTorch Float32 (SRCNN_Original 8.129 params, Compact_SRCNN 1.649 params) + Huan luyen Loss = MSE + 0.1*Sobel + Do so lieu PSNR/SSIM | [HOAN THANH] | `core_project/ai_software/models/models_srcnn.py` |
-| 2 | T1.2 | Pipeline suy thoai vat ly (blur + downsample + noise) tren NIH Chest X-ray, sinh 338 cap anh | [HOAN THANH] | `generate_degraded_dataset.py` |
-| 3 | T1.3 | Do thi hoi tu Loss (300 DPI, 4200x1500 px) | [HOAN THANH] | `core_project/ai_software/training/loss_convergence_dpi300.png` |
-| 4 | T1.4 | Script danh gia Baseline: PSNR, SSIM, Bicubic — xuat 4-sheet Excel + CSV + JSON | [HOAN THANH] | `core_project/ai_software/evaluation/evaluate_pytorch_baseline.py` |
-| 5 | T1.5 | Bao cao so sanh 8 mo hinh sieu phan giai (song ngu VN/EN, 2 PDF, 12 bieu do 300 DPI) | [HOAN THANH] | `performance_comparison_report.pdf`, `performance_comparison_report_en.pdf` |
+| 1 | T1.1 | Xây dựng 2 kiến trúc PyTorch Float32 (SRCNN_Original 8.129 params, Compact_SRCNN 1.649 params) + Huấn luyện với Loss = MSE + 0.1×Sobel + Đo PSNR/SSIM | [HOÀN THÀNH] | `core_project/ai_software/models/models_srcnn.py` |
+| 2 | T1.2 | Pipeline mô phỏng suy thoái vật lý (blur + downsample + noise) trên NIH Chest X-ray, sinh 338 cặp ảnh test | [HOÀN THÀNH] | `generate_degraded_dataset.py` |
+| 3 | T1.3 | Vẽ đồ thị hội tụ hàm Loss qua các epoch (300 DPI, 4200×1500 px) | [HOÀN THÀNH] | `core_project/ai_software/training/loss_convergence_dpi300.png` |
+| 4 | T1.4 | Script đánh giá Baseline: PSNR, SSIM, Bicubic — xuất bảng đối chứng 4-sheet Excel + CSV + JSON | [HOÀN THÀNH] | `core_project/ai_software/evaluation/evaluate_pytorch_baseline.py` |
+| 5 | T1.5 | Báo cáo so sánh 8 mô hình siêu phân giải (song ngữ VN/EN, 2 PDF, 12 biểu đồ 300 DPI) | [HOÀN THÀNH] | `performance_comparison_report.pdf`, `performance_comparison_report_en.pdf` |
 
-### NHIEM VU 2 — Bit-Accurate DV, Benchmark Parser & Statistical Analysis
+### NHIỆM VỤ 2 — Bit-Accurate DV, Benchmark Parser & Statistical Analysis
 
-| STT | Ma task | Mo ta | Trang thai | File chinh |
+| STT | Mã task | Mô tả | Trạng thái | File chính |
 | :---: | :---: | :--- | :---: | :--- |
-| 6 | T2.1 | Phan tich thong ke 2.200 anh PYNQ-Z2: Mean+-Std PSNR/SSIM/Gain, Histogram 300 DPI | [HOAN THANH] | `analyze_kaggle_benchmark.py`, `pynq_z2_statistical_analysis.json` |
-| 7 | T2.2 | DV Scoreboard bit-exact: 4/4 ALL_PASS, so hoc RTL 100% chinh xac tung pixel | [HOAN THANH] | `core_project/hardware_fpga/dv_verification/dv_scoreboard_check.py` |
-| 8 | T2.3 | Notebook Kaggle Compact SRCNN RTL (13 cell, 3 scale 2x/3x/4x, 38 truong xuat) | [HOAN THANH] | `legacy_experiments/notebooks_kaggle/hardware/kaggle_compact_srcnn_hardware_benchmark.ipynb` |
-| 9 | T2.4 | Do dac da nen tang CPU vs GPU vs FPGA (100 lan lap, sau 10 warm-up, Mean+-Std) | [HOAN THANH] | `benchmark_multi_platform.py`, `multi_platform_benchmark.json` |
-| 10 | T2.5 | ROI Zoom-in 4x, Error Heatmap, Fig.7 Overlap-Tiling Ablation, Fig.8 Visual Comparison (300 DPI) | [HOAN THANH] | `generate_paper_fig7.py`, `generate_paper_fig8.py` |
-| 11 | T2.6 | Dong goi ban giao: Excel 6 Sheet, figures_dpi300/ (29 file), thu muc IEEE GTSD 2026 | [HOAN THANH] | `hardware_benchmark_statistics.xlsx`, `figures_dpi300/` |
+| 6 | T2.1 | Phân tích thống kê 2.200 ảnh từ JSON PYNQ-Z2: Mean ± Std PSNR/SSIM/Gain, Histogram 300 DPI | [HOÀN THÀNH] | `analyze_kaggle_benchmark.py`, `pynq_z2_statistical_analysis.json` |
+| 7 | T2.2 | Kiểm thử DV Scoreboard bit-exact: 4/4 kịch bản ALL_PASS, số học RTL chính xác 100% từng pixel | [HOÀN THÀNH] | `core_project/hardware_fpga/dv_verification/dv_scoreboard_check.py` |
+| 8 | T2.3 | Notebook Kaggle Compact SRCNN RTL (13 cell, 3 scale 2x/3x/4x, 38 trường xuất) | [HOÀN THÀNH] | `legacy_experiments/notebooks_kaggle/hardware/kaggle_compact_srcnn_hardware_benchmark.ipynb` |
+| 9 | T2.4 | Đo đạc thực nghiệm đa nền tảng CPU vs GPU vs FPGA (100 lần lặp, sau 10 lần warm-up, Mean ± Std) | [HOÀN THÀNH] | `benchmark_multi_platform.py`, `multi_platform_benchmark.json` |
+| 10 | T2.5 | Cắt vùng quan tâm ROI Zoom-in 4x, Error Heatmap, Fig.7 Overlap-Tiling Ablation, Fig.8 Visual Comparison (300 DPI) | [HOÀN THÀNH] | `generate_paper_fig7.py`, `generate_paper_fig8.py` |
+| 11 | T2.6 | Đóng gói bàn giao: Excel 6 Sheet, `figures_dpi300/` (29 file), thư mục IEEE GTSD 2026 | [HOÀN THÀNH] | `hardware_benchmark_statistics.xlsx`, `figures_dpi300/` |
 
 ---
 
-## 3. CHECKLIST SAN PHAM BAN GIAO (13 san pham)
+## 3. CHECKLIST SẢN PHẨM BÀN GIAO (13 sản phẩm)
 
-### A. Nhiem vu 1
+### A. Nhiệm vụ 1 (AI Modeling & Baseline)
 
-| Ma | San pham | File | Trang thai |
+| Mã | Sản phẩm | File | Trạng thái |
 | :---: | :--- | :--- | :---: |
-| D1.1 | Checkpoint Compact SRCNN Float32 (1.649 params, Val PSNR 24.33 dB) | `core_project/ai_software/checkpoints/compact_srcnn_float32.pth` | [DA CO] |
-| D1.2 | Script sinh tap suy thoai vat ly (338 cap anh) | `generate_degraded_dataset.py` | [DA CO] |
-| D1.3 | Script danh gia Baseline (PSNR, SSIM, Bicubic) | `core_project/ai_software/evaluation/evaluate_pytorch_baseline.py` | [DA CO] |
-| D1.4 | Do thi hoi tu Loss 300 DPI (4200x1500 px) | `core_project/ai_software/training/loss_convergence_dpi300.png` | [DA CO] |
-| D1.5 | Bang so lieu PSNR/SSIM doi chung (4-sheet Excel + CSV + JSON) | `core_project/benchmarks_reports/deliverables_export/baseline_psnr_ssim_comparison.xlsx` | [DA CO] |
+| D1.1 | Checkpoint Compact SRCNN Float32 (1.649 params, Val PSNR 24.33 dB) | `core_project/ai_software/checkpoints/compact_srcnn_float32.pth` | [ĐÃ CÓ] |
+| D1.2 | Script sinh tập suy thoái vật lý (338 cặp ảnh) | `generate_degraded_dataset.py` | [ĐÃ CÓ] |
+| D1.3 | Script đánh giá Baseline (PSNR, SSIM, Bicubic) | `core_project/ai_software/evaluation/evaluate_pytorch_baseline.py` | [ĐÃ CÓ] |
+| D1.4 | Đồ thị hội tụ Loss 300 DPI (4200×1500 px) | `core_project/ai_software/training/loss_convergence_dpi300.png` | [ĐÃ CÓ] |
+| D1.5 | Bảng số liệu PSNR/SSIM đối chứng (4-sheet Excel + CSV + JSON) | `core_project/benchmarks_reports/deliverables_export/baseline_psnr_ssim_comparison.xlsx` | [ĐÃ CÓ] |
 
-### B. Nhiem vu 2
+### B. Nhiệm vụ 2 (Bit-Accurate DV & Hardware Benchmark)
 
-| Ma | San pham | File | Trang thai |
+| Mã | Sản phẩm | File | Trạng thái |
 | :---: | :--- | :--- | :---: |
-| D2.1 | Notebook Kaggle Compact SRCNN RTL (13 cell) | `legacy_experiments/notebooks_kaggle/hardware/kaggle_compact_srcnn_hardware_benchmark.ipynb` | [DA CO] |
-| D2.2 | Script phan tich JSON + Histogram 300 DPI | `analyze_kaggle_benchmark.py` | [DA CO] |
-| D2.3 | DV Scoreboard 4/4 ALL_PASS bit-exact | `core_project/hardware_fpga/dv_verification/dv_scoreboard_check.py` | [DA CO] |
-| D2.4 | Excel thong ke + do dac da nen tang (6 Sheet) | `hardware_benchmark_statistics.xlsx` | [DA CO] |
-| D2.5 | figures_dpi300/ 300 DPI (29 file: Histogram, ROI, Heatmap) | `figures_dpi300/` | [DA CO] |
-| D2.6 | Bao cao 8 mo hinh song ngu VN/EN (2 PDF + 12 bieu do) | `performance_comparison_report.pdf`, `performance_comparison_report_en.pdf` | [DA CO] |
-| D2.7 | Fig.7 Overlap-Tiling Ablation (300 DPI, 4769x1685 px) | `figures_dpi300/fig7_boundary_ablation.png` | [DA CO] |
-| D2.8 | Fig.8 Visual Comparison 2x7 Matrix (300 DPI, 4710x1415 px) | `figures_dpi300/fig8_visual_comparison.png` | [DA CO] |
+| D2.1 | Notebook Kaggle Compact SRCNN RTL (13 cell) | `legacy_experiments/notebooks_kaggle/hardware/kaggle_compact_srcnn_hardware_benchmark.ipynb` | [ĐÃ CÓ] |
+| D2.2 | Script phân tích JSON + Histogram 300 DPI | `analyze_kaggle_benchmark.py` | [ĐÃ CÓ] |
+| D2.3 | DV Scoreboard 4/4 ALL_PASS bit-exact | `core_project/hardware_fpga/dv_verification/dv_scoreboard_check.py` | [ĐÃ CÓ] |
+| D2.4 | Excel thống kê + đo đạc đa nền tảng (6 Sheet) | `hardware_benchmark_statistics.xlsx` | [ĐÃ CÓ] |
+| D2.5 | `figures_dpi300/` 300 DPI (29 file: Histogram, ROI, Heatmap) | `figures_dpi300/` | [ĐÃ CÓ] |
+| D2.6 | Báo cáo 8 mô hình song ngữ VN/EN (2 PDF + 12 biểu đồ) | `performance_comparison_report.pdf`, `performance_comparison_report_en.pdf` | [ĐÃ CÓ] |
+| D2.7 | Fig.7 Overlap-Tiling Ablation (300 DPI, 4769×1685 px) | `figures_dpi300/fig7_boundary_ablation.png` | [ĐÃ CÓ] |
+| D2.8 | Fig.8 Visual Comparison ma trận 2×7 (300 DPI, 4710×1415 px) | `figures_dpi300/fig8_visual_comparison.png` | [ĐÃ CÓ] |
 
 ---
 
-## 4. BAO CAO 2 FILE REQUIREMENTS
+## 4. BÁO CÁO 2 FILE REQUIREMENTS
 
-### 4.1. requirements.txt chinh (root) — SU DUNG CHO MOI THIET BI MOI
+### 4.1. `requirements.txt` chính (root) — SỬ DỤNG CHO MỌI THIẾT BỊ MỚI
 
-Duong dan: `requirements.txt`
+Đường dẫn: `requirements.txt`
 
 ```
 torch>=1.12.0
@@ -87,22 +87,22 @@ openpyxl>=3.0.0
 Pillow>=9.0.0
 ```
 
-Ket luan: Day du, co rang buoc phien ban toi thieu ro rang.
+Kết luận: Đầy đủ, có ràng buộc phiên bản tối thiểu rõ ràng.
 
-Cai dat Mac/Linux:
+Cài đặt Mac/Linux:
 ```bash
 pip install -r requirements.txt
 ```
 
-Cai dat Windows (CUDA 12.1):
+Cài đặt Windows (CUDA 12.1):
 ```bash
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 pip install -r requirements.txt
 ```
 
-### 4.2. requirements.txt legacy (survey_assets) — CHI DE THAM KHAO
+### 4.2. `requirements.txt` legacy (survey_assets) — CHỈ ĐỂ THAM KHẢO
 
-Duong dan: `legacy_experiments/survey_assets/requirements.txt`
+Đường dẫn: `legacy_experiments/survey_assets/requirements.txt`
 
 ```
 torch
@@ -114,84 +114,87 @@ tqdm
 opencv-python
 ```
 
-Phan tich so sanh:
+Phân tích so sánh:
 
-| Goi | Root requirements.txt | Legacy requirements.txt |
+| Gói | Root `requirements.txt` | Legacy `requirements.txt` |
 | :--- | :---: | :---: |
-| torch | >=1.12.0 | (khong rang buoc) |
-| torchvision | >=0.13.0 | (khong rang buoc) |
-| numpy | >=1.21.0 | (khong rang buoc) |
-| opencv-python | >=4.5.0 | (khong rang buoc) |
-| scipy | >=1.7.0 | THIEU |
-| matplotlib | >=3.5.0 | THIEU |
-| pandas | >=1.3.0 | (khong rang buoc) |
-| openpyxl | >=3.0.0 | THIEU |
-| Pillow | >=9.0.0 | (khong rang buoc) |
-| tqdm | KHONG CO | Co (khong bat buoc) |
+| torch | >=1.12.0 | (không ràng buộc) |
+| torchvision | >=0.13.0 | (không ràng buộc) |
+| numpy | >=1.21.0 | (không ràng buộc) |
+| opencv-python | >=4.5.0 | (không ràng buộc) |
+| scipy | >=1.7.0 | **THIẾU** |
+| matplotlib | >=3.5.0 | **THIẾU** |
+| pandas | >=1.3.0 | (không ràng buộc) |
+| openpyxl | >=3.0.0 | **THIẾU** |
+| Pillow | >=9.0.0 | (không ràng buộc) |
+| tqdm | Không có | Có (không bắt buộc) |
 
-Khuyen nghi: KHONG dung file legacy de cai dat. Chi dung `requirements.txt` o root.
-File legacy duoc giu nguyen de tra lai lich su giai doan khao sat.
+Khuyến nghị: KHÔNG dùng file legacy để cài đặt môi trường. Chỉ dùng `requirements.txt` ở root.
+File legacy được giữ nguyên để tra lại lịch sử giai đoạn khảo sát ban đầu.
 
 ---
 
-## 5. KIEM TRA MO HINH (MODEL AUDIT)
+## 5. KIỂM TRA MÔ HÌNH (MODEL AUDIT)
 
-File: `core_project/ai_software/models/models_srcnn.py` (251 dong, 9.669 byte)
+File định nghĩa: `core_project/ai_software/models/models_srcnn.py` (251 dòng, 9.669 byte)
 
-| Class | Kien truc | So params | Vai tro | Trang thai |
+| Class | Kiến trúc | Số params | Vai trò | Trạng thái |
 | :--- | :--- | :---: | :--- | :---: |
-| `SRCNN_Original` | 1->64->32->1 (k9,k1,k5) | 8.129 | Baseline so sanh (software) | [GIU LAI] |
-| `Compact_SRCNN` | 1->16->8->1 (k9,k1,k5) | 1.649 | Mo hinh chinh khop 100% RTL FPGA | [GIU LAI] |
+| `SRCNN_Original` | 1→64→32→1 (k9,k1,k5) | 8.129 | Baseline so sánh (software) | [GIỮ LẠI] |
+| `Compact_SRCNN` | 1→16→8→1 (k9,k1,k5) | 1.649 | Mô hình chính khớp 100% RTL FPGA | [GIỮ LẠI] |
 
-Ket luan: File models_srcnn.py chi chua dung 2 class + 1 ham tien ich get_model_summary().
-Khong con model du thua. Yeu cau "chi giu SRCNN goc va Compact_SRCNN" DA THOA MAN.
+Kết luận: File `models_srcnn.py` chỉ chứa đúng 2 class trên + 1 hàm tiện ích `get_model_summary()`.
+Không còn mô hình dư thừa. Yêu cầu "chỉ giữ lại SRCNN gốc và Compact SRCNN" đã được thỏa mãn.
 
 ---
 
-## 6. HO TRO WINDOWS
+## 6. HỖ TRỢ WINDOWS
 
-| File | Muc dich | Commit |
+| File | Mục đích | Commit |
 | :--- | :--- | :--- |
-| `run_benchmark_windows.bat` | 1-click batch script (CMD) | 73fb54c |
-| `run_benchmark_windows.ps1` | PowerShell script | 73fb54c |
-| `HUONG_DAN_CHAY_WINDOWS.md` | Huong dan cai dat va chay | 73fb54c |
-| `MEASUREMENT_GUIDE_X86_CUDA.md` | Huong dan do dac x86/CUDA | 0102647 |
+| `run_benchmark_windows.bat` | 1-click batch script (Command Prompt) | 73fb54c |
+| `run_benchmark_windows.ps1` | PowerShell script (có elevation check) | 73fb54c |
+| `HUONG_DAN_CHAY_WINDOWS.md` | Hướng dẫn cài đặt Python, CUDA và chạy | 73fb54c |
+| `MEASUREMENT_GUIDE_X86_CUDA.md` | Hướng dẫn đo đạc thực nghiệm x86/CUDA | 0102647 |
 
 ---
 
-## 7. LICH SU GIT (15 COMMIT GAN NHAT)
+## 7. LỊCH SỬ GIT (16 COMMIT GẦN NHẤT)
 
 ```
-19b2f1d  fix(git): update .gitignore — whitelist eval image, add .vs/
+78d24ef  docs(status): add project status report with full task checklist, requirements audit, model audit
+085c931  docs(benchmark): add windows benchmark results and exported task report pdf
+1412464  feat(notebook): add editable task report notebook with pdf export capability
+5e404d1  docs(report): export comprehensive task progress and benchmark report
+cd5b556  fix(windows): support automatic conda detection and fix utf-8 console output
+19b2f1d  fix(git): update .gitignore — whitelist eval image 00001255_011, add .vs/
 73fb54c  feat(windows): 1-click windows scripts, requirements.txt, setup guide
-fd239dd  docs(roadmap): record completion of Fig 7 and Fig 8
+fd239dd  docs(roadmap): record completion of Fig 7 and Fig 8 publication assets
 cc97c7a  feat(visual): multi-model visual comparison generator, Fig 8 (300 DPI)
 5d2b2ff  feat(visual): overlap-tiling ablation generator, Fig 7 (300 DPI)
 a7260ae  feat(deliverables): master Excel workbook, 300 DPI figures (T2.6)
 1796832  feat(visual): ROI zoom-in 4x, residual error heatmaps (T2.5)
 0102647  feat(benchmark): multi-platform benchmark script, results (T2.4)
 3a636fb  feat(benchmark): statistical analysis 2,200 images, histograms (T2.3)
-3f35ea3  style(analysis): standardize white row backgrounds
-9a30a8e  refactor(analysis): synchronize analysis notebook
-39369fd  style(analysis): remove bold from SRCNN models in catalog
-f490f19  fix(analysis): restore baseline label for bicubic
 9ce2ebc  feat(analysis): generate English edition of performance report
 d5e9689  refactor(analysis): move channel numbers to footnotes
 ```
 
 ---
 
-## 8. HANG MUC CON LAI / VIEC OPTIONAL
+## 8. HẠNG MỤC CÒN LẠI / VIỆC TÙY CHỌN
 
-> Theo TASK_ROADMAP.md: tat ca 12/12 task DA HOAN THANH.
-> Git: HEAD = origin/main, working tree sach.
+> Theo TASK_ROADMAP.md: toàn bộ **12/12 task đã HOÀN THÀNH**.
+> Git: HEAD = origin/main, working tree sạch.
 
-| Uu tien | Hang muc | Mo ta |
+Các hạng mục tùy chọn (không bắt buộc) có thể thực hiện thêm:
+
+| Ưu tiên | Hạng mục | Ghi chú |
 | :---: | :--- | :--- |
-| THAP | Chay Notebook Kaggle tren GPU | Upload .ipynb len Kaggle, chay ~20 phut, tai file zip ket qua |
-| THAP | Them tqdm vao root requirements.txt | Tien ich, khong bat buoc |
-| THAP | Them scikit-image vao requirements.txt | Tinh SSIM bang scikit-image chinh xac hon |
+| THẤP | Chạy Notebook Kaggle trên GPU để lấy file ZIP kết quả thực tế PYNQ-Z2 | Cần upload lên Kaggle GPU, chạy ~20 phút |
+| THẤP | Thêm `tqdm` vào root `requirements.txt` | Tiện ích, không bắt buộc |
+| THẤP | Thêm `scikit-image` vào `requirements.txt` | Tính SSIM chính xác hơn |
 
 ---
 
-*Tao tu dong boi Antigravity IDE — 2026-09-20T15:25:00+07:00*
+*Tạo tự động bởi Antigravity IDE — 2026-09-20T15:37:00+07:00*
